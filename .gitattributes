@@ -1,0 +1,4 @@
+# Normalize all text files to LF in the repository and on every checkout.
+# Prevents CRLF line endings from breaking Prettier and other Unix-sensitive
+# tooling on Windows checkouts.
+* text=auto eol=lf
