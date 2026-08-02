@@ -1,0 +1,16 @@
+{
+  "id": 42,
+  "name": "Acme Billing",
+  "accessToken": "sk-live-0123456789abcdef",
+  "headers": {
+    "authorization": "Bearer abc123",
+    "x-api-key": "key-12345",
+    "x-request-id": "req-1"
+  },
+  "profile": {
+    "password": "hunter2",
+    "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhY21lIn0.signature",
+    "nickname": "acme-bot"
+  },
+  "ok": true
+}

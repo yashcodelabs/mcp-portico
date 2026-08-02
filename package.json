@@ -1,0 +1,55 @@
+{
+  "name": "mcp-portico",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP Portico - a generic, multi-tenant MCP frontend for HTTP APIs",
+  "license": "Apache-2.0",
+  "keywords": [
+    "mcp",
+    "openapi",
+    "catalog",
+    "api-gateway",
+    "multi-tenant"
+  ],
+  "bin": {
+    "mcp-portico": "dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "format:check": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "vitest run",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "test:fixtures": "node scripts/validate-fixtures.mjs",
+    "sweep": "node scripts/sweep.mjs",
+    "sweep:brand": "node scripts/sweep.mjs --brand",
+    "sweep:secrets": "node scripts/sweep.mjs --secrets",
+    "smoke": "node scripts/smoke-cli.mjs",
+    "cli": "tsx src/cli/index.ts",
+    "mcp-portico": "tsx src/cli/index.ts",
+    "serve": "tsx src/cli/index.ts serve",
+    "ci:check": "pnpm typecheck && pnpm format:check && pnpm test && pnpm test:fixtures && pnpm sweep && pnpm build && pnpm smoke"
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "prettier": "^3.4.2",
+    "tsx": "^4.20.3",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

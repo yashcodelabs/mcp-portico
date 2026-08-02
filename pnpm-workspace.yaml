@@ -1,0 +1,6 @@
+# Standalone package.
+packages:
+  - '.'
+
+allowBuilds:
+  esbuild: true
