@@ -1,0 +1,20 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "sample",
+    "title": "Sample API",
+    "version": "1.0.0"
+  },
+  "provenance": {
+    "sourceType": "manual"
+  },
+  "checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "operations": {
+    "sample.get": {
+      "method": "GET",
+      "path": "/sample",
+      "risk": "read",
+      "bogus": true
+    }
+  }
+}

@@ -5,3 +5,6 @@ LICENSE
 coverage
 .env
 .env.*
+# Generated compiler output; kept byte-identical to JSON.stringify(catalog, null, 2).
+examples/sample-catalog.json
+test/fixtures/catalog/sample-catalog.json

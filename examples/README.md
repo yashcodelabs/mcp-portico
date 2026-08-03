@@ -1,5 +1,9 @@
 # Examples
 
-Sample OpenAPI specs, policy overlays, registries, catalogs, and connection
-configurations land here in later phases (catalog v2 in Phase 2, registries and
-connections in Phase 3, importer fixtures in Phase 4).
+- `sample-catalog.json` - a compiled catalog v2 artifact (billing API) that
+  passes `mcp-portico catalog validate`.
+- `sample-overlay.json` - a policy overlay v1 that restricts and annotates
+  operations during compilation.
+
+OpenAPI specs, registries, and connection configurations land here in later
+phases (importers in Phase 4, registry and connections in Phase 3).

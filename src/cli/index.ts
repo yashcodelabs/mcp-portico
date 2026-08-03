@@ -3,6 +3,8 @@
 import { Command, InvalidArgumentError } from 'commander';
 
 import { DEFAULT_AUTH_MODE, parseAuthMode } from '../auth/binding';
+import { diffCatalogs, formatDiff } from '../catalog/diff';
+import { loadCatalog } from '../catalog/load';
 import { envName, PACKAGE_NAME, PRODUCT_NAME, PRODUCT_VERSION } from '../shared/brand';
 import { formatCliError, toExitCode } from '../shared/errors';
 import { startServer } from './serve';
@@ -69,6 +71,42 @@ program
   .action(async (options: { host: string; port: number; authMode: string }) => {
     try {
       await runServe(options.host, options.port, options.authMode);
+    } catch (error) {
+      console.error(formatCliError(error));
+      process.exitCode = toExitCode(error);
+    }
+  });
+
+const catalog = program
+  .command('catalog')
+  .description('Catalog compilation and maintenance');
+
+catalog
+  .command('validate <file>')
+  .description('Validate a catalog v2 file (schema, semantics, and checksum)')
+  .action(async (file: string) => {
+    try {
+      const { catalog: loaded, index } = loadCatalog(file);
+      for (const warning of loaded.provenance.warnings ?? []) {
+        console.warn(`warning: ${warning.code}: ${warning.message}`);
+      }
+      console.log(
+        `Valid: ${index.ids().length} operation(s), checksum ${loaded.checksum.slice(0, 18)}...`,
+      );
+    } catch (error) {
+      console.error(formatCliError(error));
+      process.exitCode = toExitCode(error);
+    }
+  });
+
+catalog
+  .command('diff <old-catalog> <new-catalog>')
+  .description('Compare two catalog v2 files')
+  .action(async (oldFile: string, newFile: string) => {
+    try {
+      const oldCatalog = loadCatalog(oldFile).catalog;
+      const newCatalog = loadCatalog(newFile).catalog;
+      console.log(formatDiff(diffCatalogs(oldCatalog, newCatalog), oldFile, newFile));
     } catch (error) {
       console.error(formatCliError(error));
       process.exitCode = toExitCode(error);

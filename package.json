@@ -43,6 +43,8 @@
     "ci:check": "pnpm typecheck && pnpm format:check && pnpm test && pnpm test:fixtures && pnpm sweep && pnpm build && pnpm smoke"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "commander": "^12.1.0"
   },
   "devDependencies": {

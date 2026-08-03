@@ -1,0 +1,361 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yashcodelabs/mcp-portico/main/schemas/catalog.v2.schema.json",
+  "title": "MCP Portico Catalog v2",
+  "description": "Compiled, validated runtime allowlist of operations and schemas for one backend API.",
+  "type": "object",
+  "required": ["catalogVersion", "api", "provenance", "operations"],
+  "properties": {
+    "catalogVersion": {
+      "const": "2.0"
+    },
+    "api": {
+      "type": "object",
+      "required": ["id", "title", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["sourceType"],
+      "properties": {
+        "sourceType": {
+          "enum": ["openapi", "manual", "ai"]
+        },
+        "sourceChecksum": {
+          "type": "string"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "compilerVersion": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/warning"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "checksum": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "securitySchemes": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/securityScheme"
+      }
+    },
+    "operations": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/operation"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "warning": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "securityScheme": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["apiKey", "http", "oauth2", "openIdConnect", "mutualTLS"]
+        },
+        "in": {
+          "enum": ["header", "query", "cookie"]
+        },
+        "name": {
+          "type": "string"
+        },
+        "scheme": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "operation": {
+      "type": "object",
+      "required": ["method", "path", "risk"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "available": {
+          "type": "boolean",
+          "default": true
+        },
+        "method": {
+          "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "deprecated": {
+          "type": "boolean"
+        },
+        "risk": {
+          "enum": ["read", "write", "destructive"]
+        },
+        "confirmation": {
+          "enum": ["never", "write", "destructive", "always"]
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxRequestBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxResponseBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxConcurrency": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cache": {
+          "type": "object",
+          "required": ["eligible"],
+          "properties": {
+            "eligible": {
+              "type": "boolean"
+            },
+            "ttlSeconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "security": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "redactions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/redaction"
+          }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "responses": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/response"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "redaction": {
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "request": {
+      "type": "object",
+      "properties": {
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/parameter"
+              }
+            },
+            "query": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/parameter"
+              }
+            },
+            "header": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/parameter"
+              }
+            },
+            "cookie": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/parameter"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "body": {
+          "$ref": "#/$defs/body"
+        }
+      },
+      "additionalProperties": false
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["in", "name", "required"],
+      "properties": {
+        "in": {
+          "enum": ["path", "query", "header", "cookie"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "schema": {
+          "$ref": "#/$defs/jsonSchema"
+        }
+      },
+      "additionalProperties": false
+    },
+    "body": {
+      "type": "object",
+      "required": ["kind", "contentTypes"],
+      "properties": {
+        "kind": {
+          "enum": ["json", "form", "multipart", "binary", "text"]
+        },
+        "contentTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "schema": {
+          "$ref": "#/$defs/jsonSchema"
+        }
+      },
+      "additionalProperties": false
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "contentTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "schema": {
+          "$ref": "#/$defs/jsonSchema"
+        }
+      },
+      "additionalProperties": false
+    },
+    "jsonSchema": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "api": {
+    "id": "billing",
+    "title": "Billing API",
+    "version": "1.4.0"
+  },
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    },
+    "oauth2": {
+      "type": "oauth2"
+    }
+  },
+  "operations": [
+    {
+      "operationId": "invoice.get",
+      "method": "GET",
+      "path": "/invoices/{invoiceId}",
+      "summary": "Fetch a single invoice",
+      "tags": ["invoices"],
+      "parameters": [
+        {
+          "in": "path",
+          "name": "invoiceId",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "in": "query",
+          "name": "currency",
+          "required": false,
+          "schema": {
+            "type": "string",
+            "enum": ["USD", "EUR"]
+          }
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Invoice details",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "total": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not found",
+          "contentTypes": ["application/json"]
+        }
+      },
+      "security": [["apiKey"]]
+    },
+    {
+      "method": "POST",
+      "path": "/invoices",
+      "summary": "Create an invoice",
+      "tags": ["invoices"],
+      "requestBody": {
+        "contentTypes": ["application/json"],
+        "required": true,
+        "schema": {
+          "type": "object",
+          "properties": {
+            "amount": {
+              "type": "number"
+            },
+            "currency": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created",
+          "contentTypes": ["application/json"]
+        }
+      },
+      "security": [["apiKey"]]
+    },
+    {
+      "operationId": "invoice.delete",
+      "method": "DELETE",
+      "path": "/invoices/{invoiceId}",
+      "tags": ["invoices"],
+      "parameters": [
+        {
+          "in": "path",
+          "name": "invoiceId",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "responses": {
+        "204": {
+          "description": "Deleted"
+        }
+      },
+      "security": [["apiKey"]]
+    },
+    {
+      "operationId": "report.run",
+      "method": "GET",
+      "path": "/reports/usage",
+      "summary": "Run a usage report",
+      "tags": ["reports"],
+      "responses": {
+        "200": {
+          "description": "Report",
+          "contentTypes": ["application/json"]
+        }
+      },
+      "security": [["oauth2"]]
+    }
+  ]
+}

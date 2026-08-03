@@ -45,6 +45,64 @@ function assertServeHelp() {
   console.log('smoke: serve --help ok');
 }
 
+function assertCatalog() {
+  const help = spawnSync(process.execPath, [CLI, 'catalog', '--help'], {
+    encoding: 'utf8',
+  });
+  if (help.status !== 0) fail(`catalog --help exited ${help.status}: ${help.stderr}`);
+  for (const command of ['validate', 'diff']) {
+    if (!help.stdout.includes(command)) {
+      fail(`catalog --help missing ${command}:\n${help.stdout}`);
+    }
+  }
+  console.log('smoke: catalog --help ok');
+
+  const valid = spawnSync(
+    process.execPath,
+    [CLI, 'catalog', 'validate', join(ROOT, 'examples', 'sample-catalog.json')],
+    { encoding: 'utf8' },
+  );
+  if (valid.status !== 0)
+    fail(`catalog validate exited ${valid.status}: ${valid.stderr}`);
+  if (!valid.stdout.includes('Valid: 4 operation(s)')) {
+    fail(`catalog validate unexpected output:\n${valid.stdout}`);
+  }
+  console.log('smoke: catalog validate ok');
+
+  const invalid = spawnSync(
+    process.execPath,
+    [
+      CLI,
+      'catalog',
+      'validate',
+      join(ROOT, 'test', 'fixtures', 'catalog', 'invalid', 'unknown-field.json'),
+    ],
+    { encoding: 'utf8' },
+  );
+  if (invalid.status === 0) fail('catalog validate accepted an invalid catalog');
+  if (!invalid.stderr.includes('CONFIG_ERROR')) {
+    fail(`catalog validate did not report CONFIG_ERROR:\n${invalid.stderr}`);
+  }
+  console.log('smoke: catalog validate rejects invalid input ok');
+
+  const diff = spawnSync(
+    process.execPath,
+    [
+      CLI,
+      'catalog',
+      'diff',
+      join(ROOT, 'examples', 'sample-catalog.json'),
+      join(ROOT, 'examples', 'sample-catalog.json'),
+    ],
+    { encoding: 'utf8' },
+  );
+  if (diff.status !== 0) fail(`catalog diff exited ${diff.status}: ${diff.stderr}`);
+  if (!diff.stdout.includes('No differences.')) {
+    fail(`catalog diff unexpected output:\n${diff.stdout}`);
+  }
+  console.log('smoke: catalog diff ok');
+}
+
 function freePort() {
   return new Promise((resolvePort, reject) => {
     const probe = net.createServer();
@@ -111,5 +169,6 @@ async function assertServe() {
 
 assertHelp();
 assertServeHelp();
+assertCatalog();
 await assertServe();
 console.log('smoke: all checks passed');

@@ -10,8 +10,8 @@ MCP Portico turns OpenAPI descriptions or inspected backend source code into
 policy-controlled MCP connections. One deployment can expose multiple backend
 systems while isolating tenants, credentials, catalogs, and runtime sessions.
 
-> **Status:** Phase 1 (foundation) complete. This repository is a fresh
-> implementation following the
+> **Status:** Phase 2 (catalog v2 + deterministic compiler) complete. This
+> repository is a fresh implementation following the
 > [implementation plan](docs/mcp-portico-implementation-plan.md).
 
 ## Why MCP Portico
@@ -76,18 +76,25 @@ pnpm serve      # Phase 1 health server on http://127.0.0.1:3000
 ```text
 mcp-portico serve
 mcp-portico catalog import <openapi-file>
-mcp-portico catalog validate <catalog-file>
-mcp-portico catalog diff <old-catalog> <new-catalog>
+mcp-portico catalog validate <catalog-file>   # implemented
+mcp-portico catalog diff <old-catalog> <new-catalog>   # implemented
 mcp-portico registry validate <registry-file>
 mcp-portico connection test <connection-id>
 ```
 
+The catalog v2 JSON Schema and policy overlay schema are published under
+[`schemas/`](schemas/); see
+[`examples/sample-catalog.json`](examples/sample-catalog.json) for a compiled
+example and [`examples/sample-overlay.json`](examples/sample-overlay.json) for
+its policy overlay.
+
 ## What's next
 
 The [implementation plan](docs/mcp-portico-implementation-plan.md) defines
-seven phases: catalog v2 and the deterministic compiler (2), tenant registry
-and authentication (3), OpenAPI importers (4), the operation runtime (5), the
-AI backend-analysis skill (6), and the inspector plus clean cutover (7).
+seven phases: catalog v2 and the deterministic compiler (2, done), tenant
+registry and authentication (3, next), OpenAPI importers (4), the operation
+runtime (5), the AI backend-analysis skill (6), and the inspector plus clean
+cutover (7).
 
 ## Contributing
 

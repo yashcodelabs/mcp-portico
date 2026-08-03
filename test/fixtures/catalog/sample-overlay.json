@@ -1,0 +1,27 @@
+{
+  "overlayVersion": "1.0",
+  "apiId": "billing",
+  "description": "Production policy for the billing sample API",
+  "operations": {
+    "invoice.get": {
+      "risk": "read",
+      "description": "Fetch a single invoice (policy-reviewed)",
+      "cache": {
+        "eligible": true,
+        "ttlSeconds": 300
+      },
+      "redactions": [
+        {
+          "fields": ["customerEmail"]
+        }
+      ]
+    },
+    "invoices.post": {
+      "maxRequestBytes": 262144,
+      "timeoutMs": 5000
+    },
+    "invoice.delete": {
+      "enabled": false
+    }
+  }
+}

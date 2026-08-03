@@ -1,0 +1,253 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "billing",
+    "title": "Billing API",
+    "version": "1.4.0"
+  },
+  "provenance": {
+    "sourceType": "manual",
+    "sourceChecksum": "sha256:824d987966314789a88d81b11d597bbdf819bb642f8b2d8ef02d97310e30ff87",
+    "generatedAt": "2026-08-03T00:00:00.000Z",
+    "compilerVersion": "0.1.0",
+    "confidence": 1,
+    "warnings": [
+      {
+        "code": "GENERATED_OPERATION_ID",
+        "message": "operation POST /invoices received generated id \"invoices.post\""
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation invoices.post risk inferred as \"write\" from method POST"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation invoice.delete risk inferred as \"destructive\" from method DELETE"
+      },
+      {
+        "code": "UNSUPPORTED_SECURITY_SCHEME",
+        "message": "operation report.run: security scheme \"oauth2\" (oauth2) is not supported in v1; operation is unavailable"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation report.run risk inferred as \"read\" from method GET"
+      }
+    ]
+  },
+  "checksum": "sha256:6d58295e29802224dad1624bb8b4c1e22c45433d32f91c69216c76ff5d87ed0d",
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    },
+    "oauth2": {
+      "type": "oauth2"
+    }
+  },
+  "operations": {
+    "invoice.get": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/invoices/{invoiceId}",
+      "summary": "Fetch a single invoice",
+      "description": "Fetch a single invoice (policy-reviewed)",
+      "tags": [
+        "invoices"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "cache": {
+        "eligible": true,
+        "ttlSeconds": 300
+      },
+      "security": [
+        [
+          "apiKey"
+        ]
+      ],
+      "redactions": [
+        {
+          "fields": [
+            "customerEmail"
+          ]
+        }
+      ],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "invoiceId",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "query": [
+            {
+              "in": "query",
+              "name": "currency",
+              "required": false,
+              "schema": {
+                "type": "string",
+                "enum": [
+                  "USD",
+                  "EUR"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Invoice details",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "total": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not found",
+          "contentTypes": [
+            "application/json"
+          ]
+        }
+      }
+    },
+    "invoices.post": {
+      "enabled": true,
+      "available": true,
+      "method": "POST",
+      "path": "/invoices",
+      "summary": "Create an invoice",
+      "tags": [
+        "invoices"
+      ],
+      "risk": "write",
+      "confirmation": "write",
+      "timeoutMs": 5000,
+      "maxRequestBytes": 262144,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "apiKey"
+        ]
+      ],
+      "request": {
+        "body": {
+          "kind": "json",
+          "contentTypes": [
+            "application/json"
+          ],
+          "required": true,
+          "schema": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "type": "number"
+              },
+              "currency": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created",
+          "contentTypes": [
+            "application/json"
+          ]
+        }
+      }
+    },
+    "invoice.delete": {
+      "enabled": false,
+      "available": true,
+      "method": "DELETE",
+      "path": "/invoices/{invoiceId}",
+      "tags": [
+        "invoices"
+      ],
+      "risk": "destructive",
+      "confirmation": "destructive",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "apiKey"
+        ]
+      ],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "invoiceId",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "204": {
+          "description": "Deleted"
+        }
+      }
+    },
+    "report.run": {
+      "enabled": true,
+      "available": false,
+      "method": "GET",
+      "path": "/reports/usage",
+      "summary": "Run a usage report",
+      "tags": [
+        "reports"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "oauth2"
+        ]
+      ],
+      "responses": {
+        "200": {
+          "description": "Report",
+          "contentTypes": [
+            "application/json"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yashcodelabs/mcp-portico/main/schemas/overlay.v1.schema.json",
+  "title": "MCP Portico Policy Overlay v1",
+  "description": "Human-reviewed policy rules that enrich or restrict imported API metadata. Overlays restrict or annotate; they cannot invent operations.",
+  "type": "object",
+  "required": ["overlayVersion", "operations"],
+  "properties": {
+    "overlayVersion": {
+      "const": "1.0"
+    },
+    "apiId": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "operations": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/operationPolicy"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "operationPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "risk": {
+          "enum": ["read", "write", "destructive"]
+        },
+        "confirmation": {
+          "enum": ["never", "write", "destructive", "always"]
+        },
+        "summary": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxRequestBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxResponseBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxConcurrency": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cache": {
+          "type": "object",
+          "properties": {
+            "eligible": {
+              "type": "boolean"
+            },
+            "ttlSeconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "redactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "headers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
