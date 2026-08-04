@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1400" height="560" viewBox="0 0 1400 560" role="img" aria-labelledby="title desc">
+  <title id="title">MCP Portico connects AI agents to multiple backend servers</title>
+  <desc id="desc">Cursor AI, Codex, and other AI agents connect to MCP Portico, which connects to one or more authorized backend servers.</desc>
+  <defs>
+    <linearGradient id="porticoGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff4cf"/>
+      <stop offset="1" stop-color="#ffe29a"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#172033" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#4f7cff"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#2eaa68"/>
+    </marker>
+    <style>
+      .title { font: 700 25px Inter, Segoe UI, Arial, sans-serif; fill: #172033; }
+      .subtitle { font: 400 15px Inter, Segoe UI, Arial, sans-serif; fill: #667085; }
+      .cardTitle { font: 700 22px Inter, Segoe UI, Arial, sans-serif; fill: #172033; }
+      .cardText { font: 500 15px Inter, Segoe UI, Arial, sans-serif; fill: #475467; }
+      .small { font: 600 13px Inter, Segoe UI, Arial, sans-serif; fill: #667085; }
+      .pill { font: 700 14px Inter, Segoe UI, Arial, sans-serif; fill: #344054; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="560" rx="28" fill="#f8fafc"/>
+  <text x="700" y="55" text-anchor="middle" class="title">One MCP front door for every backend</text>
+  <text x="700" y="82" text-anchor="middle" class="subtitle">AI agents discover and use policy-controlled APIs through MCP Portico</text>
+
+  <!-- Three primary blocks -->
+  <rect x="55" y="145" width="350" height="300" rx="22" fill="#eef4ff" stroke="#4f7cff" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="525" y="125" width="350" height="340" rx="22" fill="url(#porticoGradient)" stroke="#d99a00" stroke-width="3" filter="url(#shadow)"/>
+  <rect x="995" y="145" width="350" height="300" rx="22" fill="#edf9f2" stroke="#2eaa68" stroke-width="2" filter="url(#shadow)"/>
+
+  <!-- AI agents block -->
+  <circle cx="105" cy="195" r="22" fill="#4f7cff"/>
+  <image href="https://cdn.simpleicons.org/cursor/ffffff" xlink:href="https://cdn.simpleicons.org/cursor/ffffff" x="91" y="181" width="28" height="28" preserveAspectRatio="xMidYMid meet"/>
+  <text x="140" y="203" class="cardTitle">AI Agents</text>
+  <text x="80" y="248" class="cardText">Tools such as:</text>
+  <rect x="80" y="270" width="130" height="38" rx="19" fill="#ffffff" stroke="#c9d7ff"/>
+  <image href="https://cdn.simpleicons.org/cursor/4f7cff" xlink:href="https://cdn.simpleicons.org/cursor/4f7cff" x="91" y="279" width="20" height="20" preserveAspectRatio="xMidYMid meet"/>
+  <text x="158" y="294" text-anchor="middle" class="pill">Cursor AI</text>
+  <rect x="224" y="270" width="92" height="38" rx="19" fill="#ffffff" stroke="#c9d7ff"/>
+  <image href="https://upload.wikimedia.org/wikipedia/commons/6/66/OpenAI_logo_2025_%28symbol%29.svg" xlink:href="https://upload.wikimedia.org/wikipedia/commons/6/66/OpenAI_logo_2025_%28symbol%29.svg" x="233" y="279" width="20" height="20" preserveAspectRatio="xMidYMid meet"/>
+  <text x="281" y="294" text-anchor="middle" class="pill">Codex</text>
+  <rect x="80" y="322" width="130" height="38" rx="19" fill="#ffffff" stroke="#c9d7ff"/>
+  <image href="https://cdn.simpleicons.org/anthropic/d97757" xlink:href="https://cdn.simpleicons.org/anthropic/d97757" x="91" y="331" width="20" height="20" preserveAspectRatio="xMidYMid meet"/>
+  <text x="158" y="346" text-anchor="middle" class="pill">Claude</text>
+  <rect x="224" y="322" width="92" height="38" rx="19" fill="#ffffff" stroke="#c9d7ff"/>
+  <image href="https://cdn.simpleicons.org/githubcopilot/172033" xlink:href="https://cdn.simpleicons.org/githubcopilot/172033" x="233" y="331" width="20" height="20" preserveAspectRatio="xMidYMid meet"/>
+  <text x="281" y="346" text-anchor="middle" class="pill">Copilot</text>
+  <text x="80" y="401" class="small">Connect through MCP</text>
+
+  <!-- MCP Portico block -->
+  <circle cx="575" cy="185" r="25" fill="#172033"/>
+  <path d="M563 193 L563 178 L569 172 L581 172 L587 178 L587 193 M569 193 L569 181 L581 181 L581 193" fill="none" stroke="#ffffff" stroke-width="3"/>
+  <text x="620" y="193" class="cardTitle">MCP Portico</text>
+  <text x="700" y="237" text-anchor="middle" class="cardText">The MCP middleman</text>
+  <rect x="580" y="270" width="240" height="42" rx="21" fill="#ffffff" fill-opacity="0.72"/>
+  <text x="700" y="297" text-anchor="middle" class="pill">Catalog-controlled access</text>
+  <rect x="580" y="325" width="240" height="42" rx="21" fill="#ffffff" fill-opacity="0.72"/>
+  <text x="700" y="352" text-anchor="middle" class="pill">Tenant and auth isolation</text>
+  <rect x="580" y="380" width="240" height="42" rx="21" fill="#ffffff" fill-opacity="0.72"/>
+  <text x="700" y="407" text-anchor="middle" class="pill">One deployment, many APIs</text>
+
+  <!-- Backend block -->
+  <circle cx="1045" cy="195" r="22" fill="#2eaa68"/>
+  <path d="M1034 188 L1056 188 L1056 202 L1034 202 Z M1034 180 L1056 180 L1056 185 L1034 185 Z M1034 205 L1056 205 L1056 210 L1034 210 Z" fill="#ffffff"/>
+  <text x="1080" y="203" class="cardTitle">Backend Servers</text>
+  <text x="1025" y="248" class="cardText">Any authorized HTTP API:</text>
+  <rect x="1025" y="270" width="108" height="38" rx="19" fill="#ffffff" stroke="#bde8cf"/>
+  <text x="1079" y="294" text-anchor="middle" class="pill">API 1</text>
+  <rect x="1147" y="270" width="108" height="38" rx="19" fill="#ffffff" stroke="#bde8cf"/>
+  <text x="1201" y="294" text-anchor="middle" class="pill">API 2</text>
+  <rect x="1025" y="322" width="178" height="38" rx="19" fill="#ffffff" stroke="#bde8cf"/>
+  <text x="1114" y="346" text-anchor="middle" class="pill">... API N</text>
+  <text x="1025" y="401" class="small">Connect through HTTPS</text>
+
+  <!-- Connections -->
+  <line x1="406" y1="295" x2="515" y2="295" stroke="#4f7cff" stroke-width="4" marker-end="url(#arrowBlue)"/>
+  <line x1="515" y1="345" x2="406" y2="345" stroke="#4f7cff" stroke-width="4" marker-end="url(#arrowBlue)"/>
+  <text x="460" y="278" text-anchor="middle" class="small">MCP</text>
+  <text x="460" y="370" text-anchor="middle" class="small">responses</text>
+
+  <line x1="885" y1="295" x2="985" y2="295" stroke="#2eaa68" stroke-width="4" marker-end="url(#arrowGreen)"/>
+  <line x1="985" y1="345" x2="885" y2="345" stroke="#2eaa68" stroke-width="4" marker-end="url(#arrowGreen)"/>
+  <text x="935" y="278" text-anchor="middle" class="small">authorized calls</text>
+  <text x="935" y="370" text-anchor="middle" class="small">API responses</text>
+
+  <text x="700" y="515" text-anchor="middle" class="subtitle">Agents never connect directly to unregistered backend origins</text>
+</svg>

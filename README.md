@@ -28,6 +28,8 @@ systems while isolating tenants, credentials, catalogs, and runtime sessions.
 
 ## Architecture
 
+![MCP Portico architecture](docs/assets/mcp-portico-architecture.svg)
+
 ```mermaid
 flowchart LR
     OA["OpenAPI / Swagger 2.0-3.2"] --> IM["Import adapters"]
