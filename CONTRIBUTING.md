@@ -31,7 +31,8 @@ This runs, in order:
 6. Production build
 7. CLI smoke test (built `mcp-portico` binary: `--help` and `serve`)
 
-CI runs the same gate on Node 22 and 24 on Linux and on Node 22 on Windows.
+CI runs the same gate on Linux (Node 22 and 24), macOS (Node 22 and 24), and
+Windows (Node 22).
 
 ## Security rules
 
