@@ -21,6 +21,10 @@ The catalog is the runtime gate. MCP Portico must reject any operation, content 
 - Administration in v1: config-as-code plus an operator CLI
 - Runtime topology in v1: one process/replica
 - Registry in v1: version-controlled YAML/JSON files
+- Catalog import is an operator-only build step. It produces an inert, credential-free artifact and never creates, updates, or activates a registry entry or connection.
+- Backends are explicitly scoped as `global` or `tenant`. Tenant-scoped backends have exactly one owning tenant; global backends may be referenced by connections from multiple tenants.
+- Every connection belongs to exactly one tenant. A connection may reference only a global backend or a backend owned by that same tenant.
+- Imported server URLs are non-authoritative hints. Runtime origins, credentials, headers, and tenant-specific policy come only from validated connection configuration.
 - Secret source in v1: environment-variable references
 - Client authentication in v1: hashed static bearer API keys
 - Upstream authentication in v1: none, bearer, API key, Basic, and controlled static headers
@@ -65,15 +69,33 @@ The catalog is the runtime gate. MCP Portico must reject any operation, content 
 
 ## 3. Core terminology
 
-| Term           | Definition                                                                                               |
-| -------------- | -------------------------------------------------------------------------------------------------------- |
-| Backend        | An API definition and its compiled catalog. It contains no deployment credentials.                       |
-| Connection     | A tenant-authorized deployment of a backend: base URL, environment, authentication, headers, and policy. |
-| Tenant         | The isolation boundary that owns principals and connections.                                             |
-| Principal      | An authenticated MCP client identity within a tenant.                                                    |
-| Session        | Temporary MCP state, including the selected connection. A session is not an authentication boundary.     |
-| Catalog        | The compiled, validated, runtime allowlist of operations and schemas.                                    |
-| Policy overlay | Human-reviewed rules that enrich or restrict imported API metadata.                                      |
+| Term              | Definition                                                                                                                                          |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend           | A registry record for one API definition and catalog checksum. It is either global or owned by one tenant and contains no deployment credentials.   |
+| Connection        | A tenant-owned deployment of a permitted backend: base URL, environment, authentication, headers, and restrictive policy.                           |
+| Tenant            | The isolation boundary that owns principals, connections, tenant-scoped backends, runtime state, limits, and audit visibility.                      |
+| Principal         | An authenticated MCP client identity belonging to exactly one tenant.                                                                               |
+| Session           | Temporary MCP state bound to an authenticated tenant and principal, including a selected connection. A session is never an authentication boundary. |
+| Catalog           | An immutable, credential-free, compiled allowlist of operations and schemas identified by checksum.                                                 |
+| Policy overlay    | Human-reviewed rules compiled into a catalog to enrich or restrict imported API metadata.                                                           |
+| Connection policy | Tenant-specific rules that may only further restrict a catalog; they cannot add operations or weaken catalog security requirements.                 |
+
+### Multi-tenant ownership and authorization invariants
+
+These invariants apply to import, registry validation, discovery, execution, caching, telemetry, inspection, and configuration reload:
+
+1. Importing or copying a catalog grants no tenant or principal access. Access exists only through an enabled connection in the validated registry.
+2. Catalog files are immutable build artifacts keyed by checksum. A global catalog may be shared in memory because it contains no tenant URLs, credentials, secrets, or mutable tenant state.
+3. Backend IDs, connection IDs, tenant IDs, and principal IDs are unique in their registry namespace. A tenant-scoped backend requires `ownerTenantId`; a global backend must not have one.
+4. A connection has exactly one `tenantId` and one `backendId`. Registry validation rejects a missing backend, a cross-tenant private-backend reference, a missing catalog, or a catalog checksum mismatch.
+5. A principal belongs to exactly one tenant. Every connection in its v1 allowlist must exist and have the same `tenantId`.
+6. Tenant and principal identity are derived exclusively from the authenticated Portico credential. MCP arguments, headers, session payloads, imported documents, and upstream responses cannot select or override them.
+7. Every discovery, description, call, bulk call, health test, and inspector query re-authorizes the selected connection against the current authenticated principal and current registry snapshot.
+8. A connection policy is monotonic: it may disable operations, reduce limits, require stricter confirmation, add redaction, or constrain content types and headers. It cannot enable a catalog-disabled operation, add an operation, change its method/path, widen schemas, remove security requirements, relax confirmation, or raise catalog limits.
+9. Sessions store opaque IDs plus the bound `tenantId`, `principalId`, selected `connectionId`, registry revision, and catalog checksum. Every request is re-authenticated; mismatched, stale, revoked, or cross-principal session state is rejected or safely reselected.
+10. All mutable runtime keys include the isolation dimensions they depend on. Rate limits and concurrency include tenant and connection; sessions include tenant and principal; response caches include tenant, connection, catalog checksum, operation, normalized input, and principal whenever output can vary by principal. No response cache entry is reused across tenants or connections.
+11. Audit events include tenant, principal, connection, backend, catalog checksum, operation, registry revision, outcome, and duration. Inspector and usage queries are tenant-filtered before pagination or aggregation so counts and existence cannot leak across tenants.
+12. Registry and catalog reload is atomic. The complete candidate snapshot is validated before publication; failure preserves the prior snapshot. Removed authorization, changed ownership, disabled connections, and catalog checksum changes invalidate affected session selections and cache entries.
 
 ## 4. Target architecture
 
@@ -86,8 +108,9 @@ flowchart LR
     IM --> IR["Normalized API model"]
     POL["Policy overlay"] --> COMP["Catalog compiler"]
     IR --> COMP
-    COMP --> CAT["Validated catalog v2"]
-    CAT --> REG["Backend and connection registry"]
+    COMP --> CAT["Inert validated catalog v2"]
+    CAT --> OP["Explicit operator registry change"]
+    OP --> REG["Scoped backends and tenant connections"]
     SEC["Secret resolver"] --> REG
     IDP["Portico identity provider"] --> RT["Tenant-aware runtime"]
     REG --> RT
@@ -121,7 +144,7 @@ test/fixtures/           # importer and runtime fixtures
 
 ```text
 mcp-portico serve
-mcp-portico catalog import <openapi-file>
+mcp-portico catalog import <openapi-file> --api-id <api-id> --output <catalog-file> --report <report-file> [--overlay <overlay-file>]
 mcp-portico catalog validate <catalog-file>
 mcp-portico catalog diff <old-catalog> <new-catalog>
 mcp-portico registry validate <registry-file>
@@ -130,7 +153,7 @@ mcp-portico key create --tenant <tenant-id> --principal <principal-id>
 mcp-portico usage summary
 ```
 
-The CLI must not expose domain-specific endpoint commands or a generic arbitrary HTTP client.
+The CLI must not expose domain-specific endpoint commands or a generic arbitrary HTTP client. `catalog import` writes a catalog and import report only; it does not mutate the registry or make the backend visible to any tenant. An operator must separately add or update a backend record, pin its checksum, create tenant-owned connections, validate the complete registry, and publish that registry snapshot.
 
 ### Fixed MCP toolset
 
@@ -145,7 +168,7 @@ The CLI must not expose domain-specific endpoint commands or a generic arbitrary
 | `call_operations`    | Execute a bounded batch of independent operations.                |
 | `test_connection`    | Perform the configured health/authentication probe.               |
 
-`call_operation` must use `operationId`. It must not accept arbitrary upstream base URLs. Raw method/path execution may exist only in an explicitly enabled local debugging mode and must still be catalog-gated.
+`call_operation` must use `operationId`. It must not accept arbitrary upstream base URLs, tenant IDs, principal IDs, backend IDs, credentials, or a connection other than the session's currently authorized selection. Raw method/path execution may exist only in an explicitly enabled loopback debugging mode, must still be catalog-gated, and must not bypass tenant authorization.
 
 ## 6. Authentication and secret strategy
 
@@ -157,9 +180,9 @@ For v1, HTTP MCP clients authenticate with a high-entropy bearer API key:
 Authorization: Bearer mpp_<key-id>_<secret>
 ```
 
-The registry stores the public key ID and a keyed HMAC digest, never the plaintext key. `MCP_PORTICO_KEY_PEPPER` supplies the server-side pepper. Authentication uses constant-time comparison. Each principal maps to exactly one tenant and an allowlist of connection IDs or roles.
+The registry stores the public key ID and a keyed HMAC digest, never the plaintext key. `MCP_PORTICO_KEY_PEPPER` supplies the server-side pepper. Authentication uses constant-time comparison. Each v1 principal maps to exactly one tenant and an explicit allowlist of same-tenant connection IDs. Role-based authorization is post-v1.
 
-`MCP_PORTICO_AUTH_MODE=none` is permitted only when the server binds to a loopback interface. Remote binding with authentication disabled must fail startup validation.
+`MCP_PORTICO_AUTH_MODE=none` is permitted only when the server binds to a loopback interface. Once tenant-aware MCP tools are enabled, unauthenticated mode also requires an explicitly configured synthetic local-development principal that belongs to exactly one tenant and has an explicit connection allowlist; startup fails otherwise. Tenant or connection identity is never inferred from tool arguments. Remote binding with authentication disabled must fail startup validation.
 
 Define an `IdentityProvider` interface in phase 1 so OAuth 2.1 can replace static keys later without changing MCP tool handlers.
 
@@ -176,14 +199,49 @@ Every connection selects an `UpstreamAuthProvider`. Built-in v1 providers:
 Example:
 
 ```yaml
+tenants:
+  acme:
+    name: Acme
+  globex:
+    name: Globex
+
+backends:
+  billing:
+    scope: global
+    catalogRef: ./catalogs/billing-1.4.0.json
+    catalogChecksum: sha256:...
+  acme-ledger:
+    scope: tenant
+    ownerTenantId: acme
+    catalogRef: ./catalogs/acme-ledger-2.0.0.json
+    catalogChecksum: sha256:...
+
 connections:
-  billing-prod:
+  acme-billing-prod:
     tenantId: acme
     backendId: billing
     baseUrl: https://billing.example.com
     auth:
       type: bearer
       tokenRef: env:BILLING_PROD_TOKEN
+    policy:
+      disabledOperations: [invoice.delete]
+      maxConcurrency: 2
+  globex-billing-prod:
+    tenantId: globex
+    backendId: billing
+    baseUrl: https://billing.globex.example
+    auth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      valueRef: env:GLOBEX_BILLING_API_KEY
+  acme-ledger-prod:
+    tenantId: acme
+    backendId: acme-ledger
+    baseUrl: https://ledger.internal.example
+    auth:
+      type: none
 ```
 
 Rules:
@@ -191,10 +249,13 @@ Rules:
 - Catalogs and registries contain secret references, not secrets.
 - V1 resolves only `env:VARIABLE_NAME` references.
 - Secrets never appear in MCP responses, inspector payloads, telemetry, errors, or logs.
+- Imported OpenAPI `servers` and Swagger `host`, `schemes`, and `basePath` values are recorded only as sanitized import-report hints. They never create a connection or override its `baseUrl`.
+- A connection's `baseUrl`, including any deployment-specific path prefix, is authoritative and is joined with catalog paths by a traversal-safe URL builder.
 - The compiler records OpenAPI security requirements for each operation.
-- An operation remains disabled when its required security scheme cannot be satisfied by the connection.
+- An operation remains unavailable when its required security scheme cannot be satisfied by the selected connection. Registry validation reports incompatible connections before activation.
 - Portico client credentials are never forwarded upstream.
 - Connection-level static headers cannot override hop-by-hop, host, content-length, or Portico security headers.
+- Connection health tests, import-reference fetches, and runtime calls use separate credential and network-policy contexts; import never sends tenant connection credentials to documentation or `$ref` origins.
 
 ## 7. Catalog v2
 
@@ -242,7 +303,7 @@ Required catalog capabilities:
 - Semantic checks beyond JSON Schema validation
 - Deterministic serialization so identical inputs produce identical catalogs
 
-Policy overlays may disable operations, replace generated descriptions, assign risk, add context-derived headers, add limits, or mark fields sensitive. Overlays may restrict imported behavior but must not silently introduce an operation that does not exist in the normalized API model.
+Policy overlays may disable operations, replace generated descriptions, assign risk, add context-derived headers, add limits, or mark fields sensitive. Overlays may restrict imported behavior but must not silently introduce an operation that does not exist in the normalized API model. An overlay compiled into a catalog applies to every connection using that catalog. Tenant-specific restrictions belong in monotonic connection policy; if a tenant requires a materially different API contract or non-monotonic metadata, compile a separate catalog and backend record.
 
 ## 8. Phased implementation
 
@@ -287,6 +348,7 @@ Work:
 - Compile normalized models plus overlays into deterministic catalogs.
 - Implement operation ID generation and collision reporting.
 - Add catalog checksum, provenance, compiler warnings, confidence, and diff support.
+- Keep catalog artifacts credential-free and immutable by checksum so a global backend definition is safe to share across tenant connections.
 - Add `catalog validate` and `catalog diff` CLI commands.
 - Convert a small generic sample API manually as the reference fixture.
 
@@ -309,14 +371,20 @@ Exit criteria:
 Work:
 
 - Define schemas for tenants, principals, backends, and connections.
+- Define backend scope and ownership: `scope: global` forbids `ownerTenantId`; `scope: tenant` requires an existing `ownerTenantId`.
+- Require each backend record to pin `catalogRef` and `catalogChecksum`; load catalogs read-only and deduplicate identical checksums without sharing mutable tenant state.
+- Define a monotonic connection-policy schema and validation against the referenced catalog.
 - Implement YAML/JSON registry loading and startup validation.
+- Enforce complete referential integrity: owners, principal tenants, backend owners, connection tenants/backends, and principal connection allowlists must exist; deleting a referenced tenant, backend, connection, or catalog fails validation until dependents are removed in the same candidate snapshot.
 - Implement static bearer API-key identity with tenant and connection authorization.
 - Add `key create`, `registry validate`, and `connection test` CLI commands.
 - Implement environment secret references and all five v1 upstream auth providers.
 - Namespace session state by authenticated principal and tenant.
 - Add per-tenant and per-connection rate/concurrency limit hooks.
-- Add audit records containing principal, tenant, connection, operation, outcome, and duration.
+- Namespace caches, circuit breakers, health state, and mutable counters by tenant and connection; include principal when results or policy can vary by principal.
+- Add audit records containing principal, tenant, connection, backend, catalog checksum, registry revision, operation, outcome, and duration.
 - Prevent arbitrary base URL and credential overrides from MCP tool arguments and client headers.
+- Implement atomic registry/catalog snapshot publication and invalidate affected selections and caches on revocation, ownership changes, connection changes, or catalog updates.
 
 Security work:
 
@@ -325,18 +393,27 @@ Security work:
 - Reject loopback, link-local, metadata-service, and private-network targets unless the connection explicitly permits them.
 - Resolve and validate destinations at connection load and request time to reduce DNS rebinding risk.
 - Strip hop-by-hop and unapproved client headers.
+- Fail registry validation for cross-tenant principal allowlists, cross-tenant private-backend references, missing or mismatched catalog checksums, non-monotonic connection policy, duplicate IDs, and auth/catalog incompatibility.
 
 Tests:
 
 - Cross-tenant connection access is denied.
+- A global backend can serve two tenants only through separate tenant-owned connections, and neither tenant can observe the other's connection, URL, policy, credentials, health, limits, cache entries, or audit records.
+- A tenant-scoped backend cannot be referenced, discovered, tested, inspected, or inferred by another tenant.
+- Importing a catalog and adding a backend record without a connection grants no principal access.
 - A session ID cannot be reused to cross a principal boundary.
+- Session selection is invalidated safely after principal revocation, connection removal, ownership changes, policy changes, and catalog replacement.
+- Bulk calls cannot mix connections or smuggle tenant/connection identifiers in individual items.
 - Auth providers inject credentials correctly without logging them.
 - Unknown secret references fail startup or connection activation.
 - SSRF, redirect, DNS, and header-injection test matrix.
+- Cache, rate-limit, concurrency, health-state, inspector-count, pagination, error-message, and audit-query isolation tests use colliding operation IDs and inputs across tenants.
+- Invalid candidate registry reloads leave the previous complete snapshot active; valid revocations take effect before the next operation.
 
 Exit criteria:
 
 - An authenticated principal can see only authorized connections.
+- Registry validation proves every principal allowlist and connection/backend edge respects tenant ownership.
 - No client-controlled request value can select an unregistered upstream origin.
 - Credentials are absent from all observable runtime outputs.
 
@@ -349,10 +426,12 @@ Work:
 - Parse JSON and YAML inputs.
 - Support Swagger 2.0 and OpenAPI 3.0, 3.1, and 3.2.
 - Resolve local and explicitly permitted remote references with cycle detection and size limits.
-- Normalize servers, paths, operation IDs, parameters, request bodies, responses, tags, security schemes, examples, and deprecations.
-- Convert Swagger 2.0 host/basePath/schemes, definitions, body/form parameters, and security definitions.
+- Treat root documents and remote references as untrusted build inputs. Apply protocol/host allowlists, DNS and redirect checks, timeouts, aggregate byte/depth/document limits, and never use runtime connection credentials while fetching them.
+- Normalize paths, operation IDs, parameters, request bodies, responses, tags, security schemes, examples, and deprecations.
+- Convert Swagger 2.0 definitions, body/form parameters, and security definitions. Record OpenAPI servers and Swagger host/basePath/schemes as non-authoritative import-report hints rather than runtime routing configuration.
 - Emit structured coverage and unsupported-feature reports.
-- Add `catalog import` CLI command with overlay support.
+- Add `catalog import` CLI command with explicit API ID, output path, overlay support, source checksum, and atomic output. It must not read, mutate, or activate registry state.
+- Require an explicit operator registry change to assign backend scope/ownership, pin the catalog checksum, and create tenant connections after reviewing the import report and catalog diff.
 - Add representative fixtures for each supported specification version.
 
 Unsupported features must produce warnings or hard failures according to policy. Callbacks, links, and webhooks are not executable in v1.
@@ -363,11 +442,14 @@ Tests:
 - JSON and YAML versions generate equivalent normalized models.
 - Reference cycles, external-reference restrictions, duplicate operation IDs, and incompatible schemas are reported.
 - Authentication and multipart definitions survive import accurately.
+- Import output contains no source credentials, authorization headers, tenant identifiers, fetched URL user-info, or secret query parameters.
+- Importing identical source and overlay inputs for two intended tenants produces the same inert catalog; isolation begins only when separately validated connections are configured.
 
 Exit criteria:
 
 - All supported fixture versions compile into valid catalog v2 artifacts.
 - The importer never silently drops an executable operation or security requirement.
+- Import alone cannot make a backend or operation discoverable or executable.
 
 ### Phase 5 — Operation runtime and generic transports
 
@@ -376,7 +458,8 @@ Exit criteria:
 Work:
 
 - Implement `list_connections`, `select_connection`, `get_session`, `search_operations`, `describe_operation`, `call_operation`, `call_operations`, and `test_connection`.
-- Execute only by operation ID against the selected authorized connection.
+- Derive tenant and principal only from current authentication, then execute only by operation ID against the selected, currently authorized connection and its pinned catalog checksum.
+- Re-authorize connection ownership, principal allowlist, backend visibility, connection policy, catalog availability, and catalog/connection authentication compatibility before every discovery or execution action.
 - Validate path/query/header/cookie/body input using catalog schemas.
 - Render paths and query strings without accepting unmodeled parameters by default.
 - Implement JSON, URL-encoded form, multipart, binary, and text request transports.
@@ -386,6 +469,7 @@ Work:
 - Preserve explicit confirmation for `write` and `destructive` operations according to catalog policy.
 - Adapt bounded bulk execution to operation IDs and per-connection limits.
 - Adapt MCP Apps/API Explorer UI to operation-based execution.
+- Ensure errors are non-enumerating: unauthorized tenant, backend, connection, and operation identifiers return the same external not-found/forbidden shape without revealing existence.
 
 Tests:
 
@@ -395,10 +479,13 @@ Tests:
 - Multipart streaming without buffering beyond configured limits.
 - Response limits, redaction, schema validation, and malformed upstream responses.
 - Bulk isolation, fail-soft/fail-fast behavior, and concurrency limits.
+- Shared-global-catalog tests prove that two tenant connections use separate URLs, credentials, policies, limits, caches, health state, sessions, and audit visibility.
+- Tenant-private-backend and stale-session tests cover revocation and atomic registry/catalog reload.
 
 Exit criteria:
 
 - The fixed MCP toolset can discover and execute all supported catalog operations.
+- Every tool and Apps UI query is tenant-filtered before search, pagination, aggregation, or rendering.
 - No production MCP tool accepts arbitrary upstream origins.
 - Generic upload tests pass without any endpoint-specific code.
 
@@ -415,6 +502,7 @@ Work:
 - Attach provenance and confidence to generated metadata.
 - Generate a review report covering uncovered routes, dynamic behavior, unresolved authorization, and inferred schemas.
 - Run generated artifacts through the standard importer/compiler/validator.
+- Treat AI output exactly like any other inert import artifact: it has no tenant access until an operator assigns backend scope/ownership, pins its checksum, creates connections, and publishes a validated registry snapshot.
 
 Tests:
 
@@ -434,7 +522,7 @@ Exit criteria:
 
 Work:
 
-- Rebuild the inspector around tenants, authorized connections, catalog metadata, warnings, health tests, audit activity, and redacted runtime state.
+- Rebuild the inspector around the authenticated tenant's authorized connections, catalog metadata, warnings, health tests, audit activity, and redacted runtime state. The v1 HTTP inspector has no global cross-tenant view; deployment-wide summaries are available only through the local operator CLI under host/filesystem administration. Tenant pagination, counts, search, and aggregations must be filtered before computation.
 - Keep the inspector read-only except for safe connection tests in v1.
 - Remove legacy domain CLI commands and `commander` registrations that expose them.
 - Remove legacy first-class tools, CLI proxy, operation aliases, path rewrites, presets, portal login, and fixed org/workspace/locale context.
@@ -497,26 +585,28 @@ The primary local verification environment is WSL 2 with the repository stored o
 1. **Schema tests:** catalog, overlay, registry, connection, and auth configuration.
 2. **Compiler tests:** deterministic output and semantic validation.
 3. **Importer tests:** golden fixtures for every supported OpenAPI version.
-4. **Authorization tests:** principal, tenant, connection, and operation isolation.
+4. **Authorization tests:** import inertness; backend scope/ownership; principal, tenant, connection, catalog, and operation isolation; monotonic connection policy; revocation and atomic reload.
 5. **Security tests:** SSRF, redirects, DNS rebinding, unsafe headers, secret leakage, and response limits.
 6. **Transport tests:** JSON, form, multipart, binary, text, and bulk.
-7. **MCP integration tests:** discovery, session selection, operation execution, refresh notifications, and Apps UI metadata.
+7. **MCP integration tests:** tenant-filtered discovery, session selection and revocation, operation execution, bulk isolation, refresh notifications, and Apps UI metadata.
 8. **Package tests:** clean installation, CLI smoke tests, server startup, and npm package contents.
 
 No phase is complete merely because its code is merged. Its exit criteria and relevant security tests must pass first.
 
 ## 11. Major risks and mitigations
 
-| Risk                                             | Mitigation                                                                                                        |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| Shared deployment becomes an SSRF proxy          | Server-owned connection URLs, network policy, DNS checks, redirect restrictions, and no arbitrary base URL tools. |
-| Credential leakage                               | Secret references, centralized redaction, structured errors, audit tests, and no secret-bearing tool inputs.      |
-| AI analyzer invents API behavior                 | Generate review artifacts, attach confidence, compile deterministically, and require explicit activation.         |
-| OpenAPI feature complexity expands scope         | Support a documented HTTP subset and emit explicit coverage/unsupported reports.                                  |
-| Catalog drift from backend                       | Source checksums, repeatable imports, catalog diff, and CI freshness checks.                                      |
-| Tenant crossing through sessions or caches       | Principal/tenant namespace on all state, caches, limits, and telemetry; isolation tests.                          |
-| One-process v1 limits availability               | Pluggable registry/session/telemetry interfaces prepare for Redis/database implementations later.                 |
-| Rebrand and rewrite destabilize current behavior | Additive phases 1–4, controlled runtime cutover in phase 5, legacy deletion only in phase 7.                      |
+| Risk                                             | Mitigation                                                                                                            |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Shared deployment becomes an SSRF proxy          | Server-owned connection URLs, network policy, DNS checks, redirect restrictions, and no arbitrary base URL tools.     |
+| Credential leakage                               | Secret references, centralized redaction, structured errors, audit tests, and no secret-bearing tool inputs.          |
+| AI analyzer invents API behavior                 | Generate review artifacts, attach confidence, compile deterministically, and require explicit activation.             |
+| OpenAPI feature complexity expands scope         | Support a documented HTTP subset and emit explicit coverage/unsupported reports.                                      |
+| Catalog drift from backend                       | Source checksums, repeatable imports, catalog diff, and CI freshness checks.                                          |
+| Tenant crossing through sessions or caches       | Principal/tenant namespace on all state, caches, limits, and telemetry; isolation tests.                              |
+| Shared catalog is mistaken for shared access     | Inert imports, explicit backend scope, tenant-owned connections, checksum pinning, and authorization on every lookup. |
+| Config reload creates mixed tenant state         | Validate complete immutable snapshots, publish atomically, and invalidate affected sessions and caches by revision.   |
+| One-process v1 limits availability               | Pluggable registry/session/telemetry interfaces prepare for Redis/database implementations later.                     |
+| Rebrand and rewrite destabilize current behavior | Additive phases 1–4, controlled runtime cutover in phase 5, legacy deletion only in phase 7.                          |
 
 ## 12. Post-v1 roadmap
 
@@ -535,13 +625,13 @@ No phase is complete merely because its code is merged. Its exit criteria and re
 
 MCP Portico v1 is complete when a fresh installation can:
 
-1. Import Swagger 2.0 or OpenAPI 3.0–3.2 from JSON or YAML.
-2. Apply a policy overlay and compile a deterministic validated catalog.
-3. Configure multiple tenants and backend connections without storing plaintext secrets.
+1. Import Swagger 2.0 or OpenAPI 3.0–3.2 from JSON or YAML into an inert, credential-free catalog and import report without granting access.
+2. Apply a policy overlay and compile a deterministic validated catalog pinned by checksum.
+3. Configure global and tenant-owned backends plus multiple tenant-owned connections without storing plaintext secrets or permitting cross-tenant references.
 4. Authenticate an MCP client with a tenant-scoped Portico API key.
-5. Discover only authorized connections and operations.
+5. Discover only authorized connections and operations, with tenant filtering applied before search, counts, pagination, and aggregation.
 6. Execute catalog-gated JSON, form, multipart, binary, and text operations by operation ID.
-7. Enforce authentication, confirmation, limits, redaction, and tenant isolation.
+7. Enforce authentication, backend ownership, monotonic connection policy, confirmation, limits, redaction, cache/session isolation, revocation, and tenant isolation.
 8. Inspect redacted connection, catalog, health, and audit state.
 9. Generate reviewable OpenAPI and overlay artifacts from a backend repository using the AI skill.
 10. Pass the complete verification matrix and contain no legacy product-specific behavior or references.
