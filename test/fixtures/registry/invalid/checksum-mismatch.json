@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "tenants": [
+    {
+      "id": "acme",
+      "name": "Acme"
+    }
+  ],
+  "principals": [],
+  "backends": [
+    {
+      "id": "billing",
+      "title": "Billing API",
+      "scope": "global",
+      "catalogRef": "../../catalog/sample-catalog.json",
+      "catalogChecksum": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "connections": []
+}

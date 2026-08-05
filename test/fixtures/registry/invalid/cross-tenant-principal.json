@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "tenants": [
+    {
+      "id": "acme",
+      "name": "Acme"
+    },
+    {
+      "id": "globex",
+      "name": "Globex"
+    }
+  ],
+  "principals": [
+    {
+      "id": "acme-automation",
+      "tenantId": "acme",
+      "allowedConnectionIds": ["globex-billing-prod"]
+    }
+  ],
+  "backends": [
+    {
+      "id": "billing",
+      "title": "Billing API",
+      "scope": "global",
+      "catalogRef": "../../catalog/sample-catalog.json",
+      "catalogChecksum": "sha256:6d58295e29802224dad1624bb8b4c1e22c45433d32f91c69216c76ff5d87ed0d"
+    }
+  ],
+  "connections": [
+    {
+      "id": "globex-billing-prod",
+      "tenantId": "globex",
+      "backendId": "billing",
+      "baseUrl": "https://billing.example.com",
+      "auth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "valueRef": "env:GLOBEX_BILLING_API_KEY"
+      }
+    }
+  ]
+}

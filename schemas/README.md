@@ -4,5 +4,7 @@
   operations and schemas for one backend API.
 - `overlay.v1.schema.json` - policy overlay v1, the human-reviewed rules
   applied during catalog compilation.
-
-Registry, connection, and auth configuration schemas arrive in Phase 3.
+- `registry.v1.schema.json` - registry v1, the version-controlled tenants,
+  principals, backends, and connections that form the multi-tenant security
+  model. Catalogs are referenced by file and pinned by checksum; secrets are
+  referenced as `env:VARIABLE_NAME`, never stored.

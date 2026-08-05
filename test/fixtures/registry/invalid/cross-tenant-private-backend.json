@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "tenants": [
+    {
+      "id": "acme",
+      "name": "Acme"
+    },
+    {
+      "id": "globex",
+      "name": "Globex"
+    }
+  ],
+  "principals": [],
+  "backends": [
+    {
+      "id": "acme-ledger",
+      "title": "Acme Ledger",
+      "scope": "tenant",
+      "ownerTenantId": "acme",
+      "catalogRef": "../../catalog/sample-catalog.json",
+      "catalogChecksum": "sha256:6d58295e29802224dad1624bb8b4c1e22c45433d32f91c69216c76ff5d87ed0d"
+    }
+  ],
+  "connections": [
+    {
+      "id": "globex-ledger-prod",
+      "tenantId": "globex",
+      "backendId": "acme-ledger",
+      "baseUrl": "https://ledger.example.com",
+      "auth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "valueRef": "env:GLOBEX_LEDGER_API_KEY"
+      }
+    }
+  ]
+}

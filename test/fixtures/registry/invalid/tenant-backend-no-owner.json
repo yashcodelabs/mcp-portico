@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "tenants": [
+    {
+      "id": "acme",
+      "name": "Acme"
+    }
+  ],
+  "principals": [],
+  "backends": [
+    {
+      "id": "acme-ledger",
+      "title": "Acme Ledger",
+      "scope": "tenant",
+      "catalogRef": "../../catalog/sample-catalog.json",
+      "catalogChecksum": "sha256:6d58295e29802224dad1624bb8b4c1e22c45433d32f91c69216c76ff5d87ed0d"
+    }
+  ],
+  "connections": []
+}

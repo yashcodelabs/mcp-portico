@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "tenants": [
+    {
+      "id": "acme",
+      "name": "Acme"
+    },
+    {
+      "id": "globex",
+      "name": "Globex"
+    }
+  ],
+  "principals": [
+    {
+      "id": "acme-automation",
+      "tenantId": "acme",
+      "allowedConnectionIds": ["acme-billing-prod"]
+    },
+    {
+      "id": "globex-automation",
+      "tenantId": "globex",
+      "allowedConnectionIds": ["globex-billing-prod"]
+    }
+  ],
+  "backends": [
+    {
+      "id": "billing",
+      "title": "Billing API",
+      "scope": "global",
+      "catalogRef": "./sample-catalog.json",
+      "catalogChecksum": "sha256:6d58295e29802224dad1624bb8b4c1e22c45433d32f91c69216c76ff5d87ed0d"
+    },
+    {
+      "id": "acme-ledger",
+      "title": "Acme Ledger",
+      "scope": "tenant",
+      "ownerTenantId": "acme",
+      "catalogRef": "./sample-catalog.json",
+      "catalogChecksum": "sha256:6d58295e29802224dad1624bb8b4c1e22c45433d32f91c69216c76ff5d87ed0d"
+    }
+  ],
+  "connections": [
+    {
+      "id": "acme-billing-prod",
+      "tenantId": "acme",
+      "backendId": "billing",
+      "baseUrl": "https://example.com",
+      "auth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "valueRef": "env:ACME_BILLING_API_KEY"
+      },
+      "policy": {
+        "disabledOperations": ["invoice.delete"],
+        "confirmation": "always",
+        "timeoutMs": 5000,
+        "maxRequestBytes": 262144,
+        "maxResponseBytes": 10485760,
+        "maxConcurrency": 2,
+        "rateLimitPerMinute": 120
+      }
+    },
+    {
+      "id": "globex-billing-prod",
+      "tenantId": "globex",
+      "backendId": "billing",
+      "baseUrl": "https://example.com",
+      "auth": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "api_key",
+        "valueRef": "env:GLOBEX_BILLING_API_KEY"
+      }
+    },
+    {
+      "id": "acme-ledger-prod",
+      "tenantId": "acme",
+      "backendId": "acme-ledger",
+      "baseUrl": "https://ledger.internal.example",
+      "network": {
+        "allowedProtocols": ["https"],
+        "allowPrivateNetwork": true
+      },
+      "auth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Ledger-Key",
+        "valueRef": "env:ACME_LEDGER_API_KEY"
+      }
+    }
+  ]
+}

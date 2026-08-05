@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yashcodelabs/mcp-portico/main/schemas/registry.v1.schema.json",
+  "title": "MCP Portico Registry v1",
+  "description": "Version-controlled tenant, principal, backend, and connection configuration for MCP Portico. Catalogs are referenced by file and pinned by checksum; secrets are referenced, never stored.",
+  "type": "object",
+  "required": ["version", "tenants", "principals", "backends", "connections"],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "tenants": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/tenant"
+      }
+    },
+    "principals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/principal"
+      }
+    },
+    "backends": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/backend"
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/connection"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "secretRef": {
+      "type": "string",
+      "pattern": "^env:[A-Za-z_][A-Za-z0-9_]*$"
+    },
+    "tenant": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "principal": {
+      "type": "object",
+      "required": ["id", "tenantId", "allowedConnectionIds"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "tenantId": {
+          "$ref": "#/$defs/id"
+        },
+        "allowedConnectionIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "keyId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{16}$"
+        },
+        "keyDigest": {
+          "type": "string",
+          "pattern": "^hmac256:[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "backend": {
+      "type": "object",
+      "required": ["id", "title", "scope", "catalogRef", "catalogChecksum"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "enum": ["global", "tenant"]
+        },
+        "ownerTenantId": {
+          "$ref": "#/$defs/id"
+        },
+        "catalogRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "catalogChecksum": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "connection": {
+      "type": "object",
+      "required": ["id", "tenantId", "backendId", "baseUrl", "auth"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "tenantId": {
+          "$ref": "#/$defs/id"
+        },
+        "backendId": {
+          "$ref": "#/$defs/id"
+        },
+        "baseUrl": {
+          "type": "string",
+          "pattern": "^https?://\\S+$"
+        },
+        "auth": {
+          "$ref": "#/$defs/auth"
+        },
+        "staticHeaders": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "policy": {
+          "$ref": "#/$defs/connectionPolicy"
+        },
+        "network": {
+          "$ref": "#/$defs/networkPolicy"
+        }
+      },
+      "additionalProperties": false
+    },
+    "auth": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "const": "none"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "tokenRef"],
+          "properties": {
+            "type": {
+              "const": "bearer"
+            },
+            "tokenRef": {
+              "$ref": "#/$defs/secretRef"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "in", "name", "valueRef"],
+          "properties": {
+            "type": {
+              "const": "apiKey"
+            },
+            "in": {
+              "enum": ["header", "query"]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "valueRef": {
+              "$ref": "#/$defs/secretRef"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "usernameRef", "passwordRef"],
+          "properties": {
+            "type": {
+              "const": "basic"
+            },
+            "usernameRef": {
+              "$ref": "#/$defs/secretRef"
+            },
+            "passwordRef": {
+              "$ref": "#/$defs/secretRef"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["type", "headers"],
+          "properties": {
+            "type": {
+              "const": "staticHeaders"
+            },
+            "headers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "connectionPolicy": {
+      "type": "object",
+      "properties": {
+        "disabledOperations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "confirmation": {
+          "enum": ["never", "write", "destructive", "always"]
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600000
+        },
+        "maxRequestBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxResponseBytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxConcurrency": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rateLimitPerMinute": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "allowedContentTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "redactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "headers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "allowedProtocols": {
+          "type": "array",
+          "items": {
+            "enum": ["http", "https"]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "allowLoopback": {
+          "type": "boolean"
+        },
+        "allowLinkLocal": {
+          "type": "boolean"
+        },
+        "allowPrivateNetwork": {
+          "type": "boolean"
+        },
+        "redirects": {
+          "enum": ["none", "same-origin"]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

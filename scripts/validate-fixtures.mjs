@@ -58,6 +58,7 @@ function createValidator(schemaFile) {
 
 const validateCatalog = createValidator('catalog.v2.schema.json');
 const validateOverlay = createValidator('overlay.v1.schema.json');
+const validateRegistry = createValidator('registry.v1.schema.json');
 
 const problems = [];
 let fileCount = 0;
@@ -73,20 +74,29 @@ for (const root of FIXTURE_ROOTS) {
     const relativePath = relative(ROOT, file).replace(/\\/g, '/');
     if (ALLOWLISTED_FILES.has(relativePath)) continue;
     const content = readFileSync(file, 'utf8');
-    if (file.endsWith('.json')) {
+    const isJson = file.endsWith('.json');
+    const isYaml = file.endsWith('.yaml') || file.endsWith('.yml');
+    const basename = relativePath.split('/').pop() ?? '';
+    const isRegistryFile = basename.includes('registry');
+    if (isJson || isYaml) {
       let data;
       try {
-        data = JSON.parse(content);
+        data = isJson ? JSON.parse(content) : require('yaml').parse(content);
       } catch (error) {
-        problems.push(`${relativePath}: invalid JSON (${error.message})`);
+        problems.push(`${relativePath}: invalid document (${error.message})`);
         continue;
       }
       if (relativePath.includes('/invalid/')) {
         const catalogIssues = validateCatalog(data);
         const overlayIssues = validateOverlay(data);
-        if (catalogIssues.length === 0 && overlayIssues.length === 0) {
+        const registryIssues = validateRegistry(data);
+        if (
+          catalogIssues.length === 0 &&
+          overlayIssues.length === 0 &&
+          registryIssues.length === 0
+        ) {
           problems.push(
-            `${relativePath}: expected an invalid fixture, but it passed both catalog and overlay schema validation`,
+            `${relativePath}: expected an invalid fixture, but it passed catalog, overlay, and registry schema validation`,
           );
         }
       } else if (relativePath.endsWith('catalog.json')) {
@@ -98,6 +108,11 @@ for (const root of FIXTURE_ROOTS) {
         const issues = validateOverlay(data);
         for (const issue of issues) {
           problems.push(`${relativePath}: overlay schema: ${issue}`);
+        }
+      } else if (isRegistryFile) {
+        const issues = validateRegistry(data);
+        for (const issue of issues) {
+          problems.push(`${relativePath}: registry schema: ${issue}`);
         }
       }
     }

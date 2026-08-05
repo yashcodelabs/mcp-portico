@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "tenants": [
+    {
+      "id": "acme",
+      "name": "Acme"
+    }
+  ],
+  "principals": [],
+  "backends": [],
+  "connections": [
+    {
+      "id": "acme-billing-prod",
+      "tenantId": "acme",
+      "backendId": "ghost",
+      "baseUrl": "https://billing.example.com",
+      "auth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "valueRef": "env:ACME_BILLING_API_KEY"
+      }
+    }
+  ]
+}

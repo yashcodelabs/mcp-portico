@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "tenants": [
+    {
+      "id": "acme",
+      "name": "Acme"
+    },
+    {
+      "id": "acme",
+      "name": "Duplicate"
+    }
+  ],
+  "principals": [],
+  "backends": [],
+  "connections": []
+}
