@@ -98,6 +98,11 @@ beforeAll(async () => {
       res.end();
       return;
     }
+    if (req.url === '/redirect303') {
+      res.writeHead(303, { location: '/probe' });
+      res.end();
+      return;
+    }
     if (req.url === '/big') {
       res.writeHead(200, { 'content-type': 'text/plain' });
       res.end('x'.repeat(10_000));
@@ -107,7 +112,15 @@ beforeAll(async () => {
       // Never respond.
       return;
     }
-    res.writeHead(200, { 'content-type': 'application/json' });
+    if (req.method !== 'GET') {
+      res.writeHead(405, { allow: 'GET' });
+      res.end();
+      return;
+    }
+    res.writeHead(200, {
+      'content-type': 'application/json',
+      'x-echo-token': req.headers['x-token'] ?? 'missing',
+    });
     res.end(JSON.stringify({ auth, url: req.url }));
   });
   await new Promise<void>((resolve) => {
@@ -162,6 +175,23 @@ describe('connection probe', () => {
     expect(result.finalUrl.endsWith('/probe')).toBe(true);
   });
 
+  it('switches to GET and drops the body on a 303 redirect', async () => {
+    const result = await executeProbe({
+      url: new URL(`http://127.0.0.1:${port}/redirect303`),
+      method: 'POST',
+      body: 'payload',
+      auth: { type: 'bearer', tokenRef: 'env:PORTICO_TEST_TOKEN' },
+      network: {
+        allowedProtocols: ['http'],
+        allowLoopback: true,
+        redirects: 'same-origin',
+      },
+    });
+    expect(result.redirected).toBe(true);
+    expect(result.status).toBe(200);
+    expect(result.finalUrl.endsWith('/probe')).toBe(true);
+  });
+
   it('does not follow redirects by default', async () => {
     const result = await executeProbe({
       url: new URL(`http://127.0.0.1:${port}/redirect`),
@@ -192,6 +222,16 @@ describe('connection probe', () => {
     });
     expect(result.truncated).toBe(true);
     expect(result.bytes).toBeGreaterThan(100);
+  });
+
+  it('resolves env: references in connection static headers', async () => {
+    const result = await executeProbe({
+      url: new URL(`http://127.0.0.1:${port}/probe`),
+      auth: { type: 'bearer', tokenRef: 'env:PORTICO_TEST_TOKEN' },
+      staticHeaders: { 'x-token': 'env:PORTICO_TEST_TOKEN' },
+      network: { allowedProtocols: ['http'], allowLoopback: true },
+    });
+    expect(result.headers['x-echo-token']).toBe('probe-secret-token');
   });
 
   it('refuses loopback destinations without permission', async () => {

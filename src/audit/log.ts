@@ -16,15 +16,14 @@ export type AuditAction =
   | 'describe_operation'
   | 'call_operation'
   | 'call_operations'
-  | 'test_connection'
-  | 'registry_publish'
-  | 'key_create';
+  | 'test_connection';
 
 export interface AuditEvent {
   id: string;
   timestamp: string;
-  tenantId: string;
-  principalId: string;
+  /** Present when an authenticated identity is known (absent for failed auth). */
+  tenantId?: string;
+  principalId?: string;
   connectionId?: string;
   backendId?: string;
   catalogChecksum?: string;

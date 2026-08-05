@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   defaultUpstreamAuthRegistry,
@@ -127,5 +127,29 @@ describe('upstream auth providers', () => {
     await expect(
       apply({ type: 'staticHeaders', headers: {} } as ConnectionAuthConfig),
     ).resolves.toBeDefined();
+  });
+
+  it('never logs credentials while injecting them', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const { headers } = await apply({
+        type: 'basic',
+        usernameRef: 'env:USER',
+        passwordRef: 'env:PASS',
+      });
+      const basic = headers.get('authorization') ?? '';
+      const decoded = Buffer.from(basic.replace(/^Basic /, ''), 'base64').toString(
+        'utf8',
+      );
+      expect(decoded).toBe('alice:s3cret');
+      const bearer = await apply({ type: 'bearer', tokenRef: 'env:TOKEN' });
+      expect(bearer.headers.get('authorization')).toBe('Bearer secret-token');
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 });

@@ -48,6 +48,8 @@ connections:
       maxResponseBytes: 10485760
       maxConcurrency: 2
       rateLimitPerMinute: 120
+      allowedContentTypes:
+        - application/json
   - id: globex-billing-prod
     tenantId: globex
     backendId: billing

@@ -251,6 +251,38 @@ describe('registry semantic validation', () => {
     );
   });
 
+  it('accepts a policy restricted to catalog-known content types', () => {
+    const document = sampleRegistryDoc();
+    const acmeConnection = document.connections[0];
+    if (acmeConnection !== undefined) {
+      acmeConnection.policy = { allowedContentTypes: ['application/json'] };
+    }
+    expect(issuesFor(document)).toEqual([]);
+  });
+
+  it('rejects allowedContentTypes the catalog does not define', () => {
+    expectIssue(
+      sampleRegistryDoc({
+        connections: [
+          {
+            id: 'acme-billing-prod',
+            tenantId: 'acme',
+            backendId: 'billing',
+            baseUrl: 'https://example.com',
+            auth: {
+              type: 'apiKey',
+              in: 'header',
+              name: 'X-API-Key',
+              valueRef: 'env:ACME_KEY',
+            },
+            policy: { allowedContentTypes: ['application/xml'] },
+          },
+        ],
+      }),
+      'NON_MONOTONIC_POLICY',
+    );
+  });
+
   it('rejects unsafe static headers', () => {
     expectIssue(
       sampleRegistryDoc({
@@ -330,6 +362,7 @@ describe('registry fixture files', () => {
     'global-backend-owner.json': 'GLOBAL_BACKEND_WITH_OWNER',
     'tenant-backend-no-owner.json': 'TENANT_BACKEND_WITHOUT_OWNER',
     'unknown-operation-policy.json': 'UNKNOWN_OPERATION',
+    'non-monotonic-content-types.json': 'NON_MONOTONIC_POLICY',
     'auth-incompatible.json': 'AUTH_INCOMPATIBLE',
   };
 

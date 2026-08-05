@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command, InvalidArgumentError } from 'commander';
+import fs from 'node:fs';
 
 import { DEFAULT_AUTH_MODE, parseAuthMode } from '../auth/binding';
 import {
@@ -183,7 +184,22 @@ key
       const generated = generatePorticoKey(pepper);
       principal.keyId = generated.keyId;
       principal.keyDigest = generated.digest;
+      const originalContent = fs.readFileSync(options.registry, 'utf8');
       writeRegistryFile(options.registry, loaded.document, loaded.format);
+      try {
+        buildRegistrySnapshot(options.registry);
+      } catch (error) {
+        try {
+          fs.writeFileSync(options.registry, originalContent, 'utf8');
+        } catch {
+          // Best-effort rollback; report the validation error below.
+        }
+        throw new PorticoError(
+          'CONFIG_ERROR',
+          `Refusing to store the new key: the updated registry failed validation. The file was restored.`,
+          { cause: error },
+        );
+      }
       console.log(
         `Updated principal "${options.principal}" in ${options.registry} (key id ${generated.keyId}).`,
       );

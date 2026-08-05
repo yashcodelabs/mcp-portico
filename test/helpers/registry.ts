@@ -40,6 +40,9 @@ export function sampleCatalog(): Catalog {
         confirmation: 'write',
         timeoutMs: 5000,
         maxRequestBytes: 262144,
+        request: {
+          body: { kind: 'json', contentTypes: ['application/json'] },
+        },
       }),
       'invoice.delete': operation({
         method: 'DELETE',

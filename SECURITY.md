@@ -23,7 +23,12 @@ disclosure.
   sensitive fields.
 - Keep upstream credentials out of catalogs, registry files, MCP responses, and
   telemetry; use secret references only.
+- Treat `MCP_PORTICO_KEY_PEPPER` as a secret: it is the keying material for
+  every Portico API-key digest. Store it in a secret manager and rotate it
+  deliberately (rotation requires reissuing keys).
 - Fail closed: unknown operations, content types, auth requirements, and target
   connections must be denied.
 - Remote binding with authentication disabled (`MCP_PORTICO_AUTH_MODE=none`) is
   a startup error.
+- Destinations are restricted by network policy; cloud metadata endpoints are
+  always denied and redirects are disabled by default.

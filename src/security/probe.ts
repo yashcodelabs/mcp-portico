@@ -1,5 +1,5 @@
 import { defaultUpstreamAuthRegistry } from '../auth/upstream';
-import { defaultSecretResolver } from '../auth/secrets';
+import { defaultSecretResolver, resolveSecretOrLiteral } from '../auth/secrets';
 import type { SecretResolver } from '../auth/types';
 import type { Connection, NetworkPolicy } from '../registry/types';
 import { defaultRedactor } from '../shared/redact';
@@ -56,6 +56,8 @@ export async function executeProbe(options: ProbeOptions): Promise<ProbeResult> 
 
   let url = options.url;
   let redirected = false;
+  let method = options.method ?? 'GET';
+  let body = options.body;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     assertDestinationAllowed(url, options.network, {
@@ -67,7 +69,8 @@ export async function executeProbe(options: ProbeOptions): Promise<ProbeResult> 
 
     const headers = new Map<string, string>();
     for (const [name, value] of Object.entries(options.staticHeaders ?? {})) {
-      headers.set(name.toLowerCase(), value);
+      const resolved = await resolveSecretOrLiteral(value, secrets);
+      if (resolved !== undefined) headers.set(name.toLowerCase(), resolved);
     }
     sanitizeUpstreamHeaders(headers);
 
@@ -83,9 +86,9 @@ export async function executeProbe(options: ProbeOptions): Promise<ProbeResult> 
     let response: Response;
     try {
       response = await fetch(request.url, {
-        method: options.method ?? 'GET',
+        method,
         headers: Object.fromEntries(request.headers),
-        body: options.body,
+        body,
         redirect: 'manual',
         signal: AbortSignal.timeout(timeoutMs),
       });
@@ -113,6 +116,10 @@ export async function executeProbe(options: ProbeOptions): Promise<ProbeResult> 
       if (target !== undefined) {
         redirected = true;
         url = target;
+        if (response.status === 303) {
+          method = 'GET';
+          body = undefined;
+        }
         continue;
       }
     }

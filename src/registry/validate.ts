@@ -303,6 +303,30 @@ function validateConnectionPolicy(
     }
   }
 
+  if (policy.allowedContentTypes !== undefined && operations.length > 0) {
+    const knownContentTypes = new Set<string>();
+    for (const operation of operations) {
+      for (const contentType of operation.request?.body?.contentTypes ?? []) {
+        knownContentTypes.add(contentType);
+      }
+      for (const response of Object.values(operation.responses ?? {})) {
+        for (const contentType of response.contentTypes ?? []) {
+          knownContentTypes.add(contentType);
+        }
+      }
+    }
+    for (const contentType of policy.allowedContentTypes) {
+      if (!knownContentTypes.has(contentType)) {
+        issues.push(
+          issue(
+            'NON_MONOTONIC_POLICY',
+            `connection "${connection.id}" allowedContentTypes "${contentType}" does not exist in the catalog; connection policy cannot introduce new content types`,
+          ),
+        );
+      }
+    }
+  }
+
   return issues;
 }
 

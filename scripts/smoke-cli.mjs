@@ -9,7 +9,13 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
@@ -204,6 +210,56 @@ function assertKeyCreate() {
         `registry validate after key create exited ${validated.status}: ${validated.stderr}`,
       );
     console.log('smoke: registry validate after key create ok');
+
+    const rollbackDirectory = mkdtempSync(
+      join(os.tmpdir(), 'portico-smoke-key-rollback-'),
+    );
+    copyFileSync(
+      join(ROOT, 'examples', 'sample-catalog.json'),
+      join(rollbackDirectory, 'sample-catalog.json'),
+    );
+    const sample = JSON.parse(
+      readFileSync(join(ROOT, 'examples', 'sample-registry.json'), 'utf8'),
+    );
+    sample.backends.push({
+      id: 'billing',
+      title: 'Duplicate backend',
+      scope: 'global',
+      catalogRef: './sample-catalog.json',
+      catalogChecksum:
+        'sha256:6d58295e29802224dad1624bb8b4c1e22c45433d32f91c69216c76ff5d87ed0d',
+    });
+    const rollbackRegistry = join(rollbackDirectory, 'registry.json');
+    writeFileSync(rollbackRegistry, `${JSON.stringify(sample, null, 2)}\n`, 'utf8');
+    const beforeRollback = readFileSync(rollbackRegistry, 'utf8');
+    const rolledBack = spawnSync(
+      process.execPath,
+      [
+        CLI,
+        'key',
+        'create',
+        '--registry',
+        rollbackRegistry,
+        '--tenant',
+        'acme',
+        '--principal',
+        'acme-automation',
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, MCP_PORTICO_KEY_PEPPER: 'smoke-pepper' },
+      },
+    );
+    if (rolledBack.status === 0)
+      fail('key create succeeded against an invalid registry');
+    if (!rolledBack.stderr.includes('Refusing to store the new key')) {
+      fail(`key create did not refuse the invalid registry:\n${rolledBack.stderr}`);
+    }
+    if (readFileSync(rollbackRegistry, 'utf8') !== beforeRollback) {
+      fail('key create did not restore the registry after a failed validation');
+    }
+    rmSync(rollbackDirectory, { recursive: true, force: true });
+    console.log('smoke: key create rollback ok');
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

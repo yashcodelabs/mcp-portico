@@ -237,6 +237,7 @@ export function snapshotFromDocument(
  */
 export class RuntimeRegistry {
   private current: RegistrySnapshot | undefined;
+  private readonly subscribers = new Set<(next: RegistrySnapshot) => void>();
 
   constructor(private readonly filePath: string) {}
 
@@ -244,11 +245,22 @@ export class RuntimeRegistry {
     return this.current;
   }
 
+  /** Register a listener invoked after every successful publication. */
+  subscribe(listener: (next: RegistrySnapshot) => void): () => void {
+    this.subscribers.add(listener);
+    return () => {
+      this.subscribers.delete(listener);
+    };
+  }
+
   /** Validate and publish the registry file's current contents atomically. */
   publish(): RegistrySnapshot {
     const candidate = buildRegistrySnapshot(this.filePath);
     const revision = (this.current?.revision ?? 0) + 1;
     this.current = candidate.withRevision(revision);
+    for (const listener of [...this.subscribers]) {
+      listener(this.current);
+    }
     return this.current;
   }
 }
