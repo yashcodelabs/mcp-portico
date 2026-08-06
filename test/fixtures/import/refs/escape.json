@@ -1,0 +1,26 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Escape API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/x": {
+      "get": {
+        "operationId": "getX",
+        "responses": {
+          "200": {
+            "description": "X",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../outside.json#/X"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -10,10 +10,11 @@ MCP Portico turns OpenAPI descriptions or inspected backend source code into
 policy-controlled MCP connections. One deployment can expose multiple backend
 systems while isolating tenants, credentials, catalogs, and runtime sessions.
 
-> **Status:** Phases 1-3 complete: foundation and safety harness, catalog v2
-> with the deterministic compiler, and the tenant registry, connections, and
-> API-key authentication model. This repository is a fresh implementation
-> following the [implementation plan](docs/mcp-portico-implementation-plan.md).
+> **Status:** Phases 1-4 complete: foundation and safety harness, catalog v2
+> with the deterministic compiler, the tenant registry, connections, and
+> API-key authentication model, and the OpenAPI/Swagger importers. This
+> repository is a fresh implementation following the
+> [implementation plan](docs/mcp-portico-implementation-plan.md).
 
 ## Why MCP Portico
 
@@ -78,7 +79,7 @@ pnpm serve      # health server on http://127.0.0.1:3000
 
 ```text
 mcp-portico serve --registry <registry-file>      # implemented
-mcp-portico catalog import <openapi-file>         # Phase 4
+mcp-portico catalog import <openapi-file> --api-id <id> --output <catalog> --report <report>   # implemented
 mcp-portico catalog validate <catalog-file>       # implemented
 mcp-portico catalog diff <old> <new>              # implemented
 mcp-portico registry validate <registry-file>     # implemented
@@ -89,6 +90,28 @@ mcp-portico connection test <connection-id> --registry <file>   # implemented
 `serve` loads and validates the registry at startup (and reloads it atomically
 when the file changes), enforcing secret resolution and destination security
 policy before listening.
+
+## Importing a catalog
+
+`catalog import` compiles a Swagger 2.0 or OpenAPI 3.0-3.2 document (JSON or
+YAML) into a validated, credential-free catalog and a structured report. It
+never touches the registry.
+
+```bash
+mcp-portico catalog import ./petstore.yaml \
+  --api-id petstore \
+  --output ./catalogs/petstore-1.0.0.json \
+  --report ./catalogs/petstore-1.0.0.report.json \
+  --overlay ./petstore.overlay.json
+```
+
+External `$ref` documents are denied by default. To import them, permit
+relative file refs (`--allow-file-refs`) and/or remote refs
+(`--allow-remote-refs` with `--remote-host <host>`); remote refs are
+https-only unless `--allow-http` is set, and private/loopback destinations
+require `--allow-private-network`. The report records every dropped
+unsupported feature (callbacks, links, webhooks, unsupported content types,
+unsupported security schemes) so nothing is dropped silently.
 
 The catalog v2, policy overlay, and registry v1 JSON Schemas are published
 under [`schemas/`](schemas/); see
@@ -122,8 +145,8 @@ startup or connection activation.
 The [implementation plan](docs/mcp-portico-implementation-plan.md) defines
 seven phases: foundation (1, done), catalog v2 and the deterministic compiler
 (2, done), tenant registry and authentication (3, done), OpenAPI importers
-(4, next), the operation runtime (5), the AI backend-analysis skill (6), and
-the inspector plus clean cutover (7).
+(4, done), the operation runtime (5, next), the AI backend-analysis skill (6),
+and the inspector plus clean cutover (7).
 
 ## Contributing
 

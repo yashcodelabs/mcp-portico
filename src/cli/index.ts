@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { Command, InvalidArgumentError } from 'commander';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { DEFAULT_AUTH_MODE, parseAuthMode } from '../auth/binding';
 import {
@@ -11,7 +13,10 @@ import {
 } from '../auth/secrets';
 import { diffCatalogs, formatDiff } from '../catalog/diff';
 import { loadCatalog } from '../catalog/load';
+import { loadOverlay } from '../catalog/overlay';
 import { generatePorticoKey } from '../identity/keys';
+import { importOpenApi } from '../importers/openapi/import';
+import type { RemoteRefPolicy } from '../importers/openapi/types';
 import { envName, PACKAGE_NAME, PRODUCT_NAME, PRODUCT_VERSION } from '../shared/brand';
 import { EXIT_CODES, formatCliError, PorticoError, toExitCode } from '../shared/errors';
 import { loadRegistryFile, writeRegistryFile } from '../registry/load';
@@ -80,6 +85,29 @@ function parsePositiveInt(value: string): number {
     throw new InvalidArgumentError(`expected a positive integer, got "${value}"`);
   }
   return parsed;
+}
+
+function collect(value: string, previous: string[]): string[] {
+  return [...previous, value];
+}
+
+function writeFileAtomic(target: string, content: string): void {
+  const directory = path.dirname(target);
+  const temporary = path.join(
+    directory,
+    `.${path.basename(target)}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`,
+  );
+  try {
+    fs.writeFileSync(temporary, content, 'utf8');
+    fs.renameSync(temporary, target);
+  } catch (error) {
+    try {
+      fs.rmSync(temporary, { force: true });
+    } catch {
+      // Best-effort cleanup; report the original error.
+    }
+    throw error;
+  }
 }
 
 const program = new Command();
@@ -273,6 +301,110 @@ connection
 const catalog = program
   .command('catalog')
   .description('Catalog compilation and maintenance');
+
+catalog
+  .command('import <file>')
+  .description(
+    'Compile an OpenAPI/Swagger document (2.0, 3.0, 3.1, 3.2; JSON or YAML) into a validated catalog v2 artifact and an import report',
+  )
+  .requiredOption(
+    '--api-id <id>',
+    'catalog api id (lowercase letters, digits, hyphens)',
+  )
+  .requiredOption('--output <file>', 'catalog v2 output path (written atomically)')
+  .option('--report <file>', 'import report output path (JSON, written atomically)')
+  .option('--overlay <file>', 'policy overlay JSON file to apply during compilation')
+  .option(
+    '--allow-file-refs',
+    'permit relative file $refs that stay inside the input directory',
+  )
+  .option(
+    '--allow-remote-refs',
+    'permit remote http(s) $refs from hosts listed with --remote-host',
+  )
+  .option(
+    '--remote-host <host>',
+    'hostname allowed for remote $refs (repeatable)',
+    collect,
+    [] as string[],
+  )
+  .option('--allow-http', 'permit http: in addition to https: for remote $refs')
+  .option(
+    '--allow-private-network',
+    'permit private/loopback destinations for remote $refs (dev only)',
+  )
+  .option('--max-bytes <bytes>', 'per-document size limit in bytes', parsePositiveInt)
+  .option('--max-ref-depth <depth>', 'maximum $ref nesting depth', parsePositiveInt)
+  .action(
+    async (
+      file: string,
+      options: {
+        apiId: string;
+        output: string;
+        report?: string;
+        overlay?: string;
+        allowFileRefs?: boolean;
+        allowRemoteRefs?: boolean;
+        remoteHost: string[];
+        allowHttp?: boolean;
+        allowPrivateNetwork?: boolean;
+        maxBytes?: number;
+        maxRefDepth?: number;
+      },
+    ) => {
+      try {
+        const overlay =
+          options.overlay === undefined ? undefined : loadOverlay(options.overlay);
+        const remoteRefs: RemoteRefPolicy =
+          options.allowRemoteRefs === true || options.allowFileRefs === true
+            ? {
+                kind: 'allow',
+                fileRefs: options.allowFileRefs === true,
+                urlRefs: options.allowRemoteRefs === true,
+                urlHosts: options.remoteHost,
+                allowHttp: options.allowHttp === true,
+                allowPrivateNetwork: options.allowPrivateNetwork === true,
+              }
+            : { kind: 'deny' };
+        const { catalog, report } = await importOpenApi(file, {
+          apiId: options.apiId,
+          overlay,
+          remoteRefs,
+          limits: {
+            ...(options.maxBytes !== undefined
+              ? { maxBytesPerDocument: options.maxBytes }
+              : {}),
+            ...(options.maxRefDepth !== undefined
+              ? { maxRefDepth: options.maxRefDepth }
+              : {}),
+          },
+        });
+        writeFileAtomic(options.output, `${JSON.stringify(catalog, null, 2)}\n`);
+        if (options.report !== undefined) {
+          writeFileAtomic(options.report, `${JSON.stringify(report, null, 2)}\n`);
+        }
+        console.log(
+          `Imported ${file} as catalog "${report.api.id}" (${report.summary.operations} operation(s), ${report.catalog.available} available, checksum ${catalog.checksum.slice(0, 18)}...).`,
+        );
+        console.log(`  catalog: ${options.output}`);
+        if (options.report !== undefined) {
+          console.log(`  report: ${options.report}`);
+        }
+        for (const warning of catalog.provenance.warnings ?? []) {
+          console.warn(`warning: ${warning.code}: ${warning.message}`);
+        }
+        for (const feature of report.unsupported) {
+          console.warn(
+            `unsupported: ${feature.code}: ${feature.message}${feature.location !== undefined ? ` (${feature.location})` : ''}`,
+          );
+        }
+        // Self-check: the written artifact must load and validate.
+        loadCatalog(options.output);
+      } catch (error) {
+        handleError(error);
+      }
+    },
+  );
 
 catalog
   .command('validate <file>')

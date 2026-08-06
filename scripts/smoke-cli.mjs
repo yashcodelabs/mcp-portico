@@ -59,7 +59,7 @@ function assertCatalog() {
     encoding: 'utf8',
   });
   if (help.status !== 0) fail(`catalog --help exited ${help.status}: ${help.stderr}`);
-  for (const command of ['validate', 'diff']) {
+  for (const command of ['import', 'validate', 'diff']) {
     if (!help.stdout.includes(command)) {
       fail(`catalog --help missing ${command}:\n${help.stdout}`);
     }
@@ -110,6 +110,79 @@ function assertCatalog() {
     fail(`catalog diff unexpected output:\n${diff.stdout}`);
   }
   console.log('smoke: catalog diff ok');
+}
+
+function assertImport() {
+  const directory = mkdtempSync(join(os.tmpdir(), 'portico-smoke-import-'));
+  const catalogOut = join(directory, 'imported-catalog.json');
+  const reportOut = join(directory, 'import-report.json');
+  const spec = join(ROOT, 'test', 'fixtures', 'import', 'petstore.openapi30.json');
+  try {
+    const imported = spawnSync(
+      process.execPath,
+      [
+        CLI,
+        'catalog',
+        'import',
+        spec,
+        '--api-id',
+        'petstore',
+        '--output',
+        catalogOut,
+        '--report',
+        reportOut,
+      ],
+      { encoding: 'utf8' },
+    );
+    if (imported.status !== 0)
+      fail(`catalog import exited ${imported.status}: ${imported.stderr}`);
+    if (!imported.stdout.includes('6 operation(s)')) {
+      fail(`catalog import unexpected output:\n${imported.stdout}`);
+    }
+    console.log('smoke: catalog import ok');
+
+    const valid = spawnSync(
+      process.execPath,
+      [CLI, 'catalog', 'validate', catalogOut],
+      { encoding: 'utf8' },
+    );
+    if (valid.status !== 0)
+      fail(
+        `catalog validate of imported output exited ${valid.status}: ${valid.stderr}`,
+      );
+    if (!valid.stdout.includes('Valid: 6 operation(s)')) {
+      fail(`imported catalog validate unexpected output:\n${valid.stdout}`);
+    }
+    console.log('smoke: catalog import output validates ok');
+
+    const report = JSON.parse(readFileSync(reportOut, 'utf8'));
+    if (report.reportVersion !== '1.0' || report.summary.operations !== 6) {
+      fail(`import report unexpected shape:\n${JSON.stringify(report)}`);
+    }
+    console.log('smoke: catalog import report ok');
+
+    const rejected = spawnSync(
+      process.execPath,
+      [
+        CLI,
+        'catalog',
+        'import',
+        join(ROOT, 'test', 'fixtures', 'import', 'invalid', 'unknown-version.json'),
+        '--api-id',
+        'x',
+        '--output',
+        join(directory, 'rejected.json'),
+      ],
+      { encoding: 'utf8' },
+    );
+    if (rejected.status === 0) fail('catalog import accepted an unknown spec version');
+    if (!rejected.stderr.includes('CONFIG_ERROR')) {
+      fail(`catalog import did not report CONFIG_ERROR:\n${rejected.stderr}`);
+    }
+    console.log('smoke: catalog import rejects unknown spec version ok');
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 function assertRegistry() {
@@ -433,6 +506,7 @@ async function assertServe() {
 assertHelp();
 assertServeHelp();
 assertCatalog();
+assertImport();
 assertRegistry();
 assertKeyCreate();
 await assertConnectionTest();

@@ -1,0 +1,34 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Structural cycle",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/a": {
+      "get": {
+        "operationId": "getA",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/loopA"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "loopA": {
+        "$ref": "#/components/parameters/loopB"
+      },
+      "loopB": {
+        "$ref": "#/components/parameters/loopA"
+      }
+    }
+  }
+}

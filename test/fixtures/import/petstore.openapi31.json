@@ -1,0 +1,133 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Petstore API",
+    "version": "1.1.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.example.com/v2"
+    }
+  ],
+  "webhooks": {
+    "newPet": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Node"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Acknowledged"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/nodes/{nodeId}": {
+      "get": {
+        "operationId": "getNode",
+        "summary": "Get a node and its children",
+        "parameters": [
+          {
+            "name": "nodeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Node tree",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "openIdConnect": []
+          }
+        ]
+      }
+    },
+    "/nodes": {
+      "post": {
+        "operationId": "createNode",
+        "summary": "Create a node",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Node"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Node"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "openIdConnect": {
+        "type": "openIdConnect",
+        "openIdConnectUrl": "https://auth.example.com/.well-known/openid-configuration"
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Node": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parent": {
+            "$ref": "#/components/schemas/Node"
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Node"
+            }
+          },
+          "note": {
+            "type": ["string", "null"]
+          }
+        }
+      }
+    }
+  }
+}
