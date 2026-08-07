@@ -15,6 +15,12 @@ import { PorticoError } from '../shared/errors';
 import { CacheStore } from './cache';
 import { CircuitBreakerStore } from './circuit';
 import { HealthStore } from './health';
+import type {
+  ExecuteContext,
+  ExecuteOperationInput,
+  ExecuteResult,
+  OperationExecutor,
+} from './execution';
 
 /**
  * Tenant-aware runtime facade (Phase 3 isolation model).
@@ -36,6 +42,8 @@ export interface TenantRuntimeOptions {
   caches?: CacheStore;
   circuitBreakers?: CircuitBreakerStore;
   health?: HealthStore;
+  /** Phase 5 operation executor; required for call_operation/call_operations. */
+  executor?: OperationExecutor;
 }
 
 export interface TestConnectionOptions {
@@ -54,10 +62,12 @@ export class TenantRuntime {
 
   private currentSnapshot: RegistrySnapshot;
   private readonly identityProvider?: IdentityProvider;
+  private readonly executor?: OperationExecutor;
 
   constructor(options: TenantRuntimeOptions) {
     this.currentSnapshot = options.snapshot;
     this.identityProvider = options.identityProvider;
+    this.executor = options.executor;
     this.sessions = options.sessions ?? new SessionStore();
     this.limits = options.limits ?? new LimitsStore();
     this.audit = options.audit ?? new MemoryAuditLog();
@@ -182,6 +192,32 @@ export class TenantRuntime {
   /** Re-validate a session against the authenticated principal and snapshot. */
   assertSession(state: SessionState, principal: PorticoPrincipal): SessionState {
     return this.sessions.assertUsable(state, principal, this.currentSnapshot);
+  }
+
+  /**
+   * Execute a catalog operation (Phase 5). Re-validates the session against
+   * the authenticated principal and current snapshot, then delegates to the
+   * operation executor, which enforces confirmation, validation, isolation,
+   * network policy, response limits, and redaction.
+   */
+  async executeOperation(
+    session: SessionState,
+    principal: PorticoPrincipal,
+    input: ExecuteOperationInput,
+  ): Promise<ExecuteResult> {
+    this.assertSession(session, principal);
+    if (this.executor === undefined) {
+      throw new PorticoError(
+        'CONFIG_ERROR',
+        'No operation executor is configured for this runtime.',
+      );
+    }
+    const context: ExecuteContext = {
+      snapshot: this.currentSnapshot,
+      session,
+      principal,
+    };
+    return this.executor.execute(context, input);
   }
 
   /**

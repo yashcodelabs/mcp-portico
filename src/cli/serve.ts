@@ -12,12 +12,17 @@ import type { IdentityProvider } from '../auth/types';
 import { MemoryAuditLog, type AuditLog } from '../audit/log';
 import { StaticBearerIdentityProvider } from '../identity/static-bearer';
 import { LimitsStore } from '../limits/store';
+import { McpServer } from '../mcp/server';
 import {
   buildRegistrySnapshot,
   RuntimeRegistry,
   type RegistrySnapshot,
 } from '../registry/snapshot';
 import { assertDestinationDnsAllowed } from '../security/network';
+import { CacheStore } from '../runtime/cache';
+import { CircuitBreakerStore } from '../runtime/circuit';
+import { createOperationExecutor } from '../runtime/executor';
+import { HealthStore } from '../runtime/health';
 import { TenantRuntime } from '../runtime/tenant';
 import { SessionStore } from '../session/store';
 import { envName, PACKAGE_NAME, PRODUCT_VERSION } from '../shared/brand';
@@ -36,10 +41,13 @@ export interface ServerContext {
   snapshot?: RegistrySnapshot;
   identityProvider?: IdentityProvider;
   runtime?: TenantRuntime;
+  mcpServer?: McpServer;
   sessions: SessionStore;
   limits: LimitsStore;
   audit: AuditLog;
 }
+
+const MAX_MCP_BODY_BYTES = 10 * 1024 * 1024;
 
 export interface RunningServer {
   host: string;
@@ -61,6 +69,28 @@ function sendJson(
     ...extraHeaders,
   });
   res.end(payload);
+}
+
+/** Read a request body up to `limit` bytes; rejects when the limit is exceeded. */
+function readBody(req: http.IncomingMessage, limit: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let received = 0;
+    req.on('data', (chunk: Buffer) => {
+      received += chunk.length;
+      if (received <= limit) chunks.push(chunk);
+    });
+    req.on('end', () => {
+      if (received > limit) {
+        reject(
+          new PorticoError('USAGE', `Request body exceeds the ${limit} byte limit.`),
+        );
+        return;
+      }
+      resolve(Buffer.concat(chunks).toString('utf8'));
+    });
+    req.on('error', reject);
+  });
 }
 
 export async function startServer(options: ServeOptions): Promise<RunningServer> {
@@ -93,12 +123,25 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
       identityProvider = new StaticBearerIdentityProvider(snapshot, pepper);
       await identityProvider.validate();
     }
+    const caches = new CacheStore();
+    const circuitBreakers = new CircuitBreakerStore();
+    const health = new HealthStore();
     runtime = new TenantRuntime({
       snapshot,
       identityProvider,
       sessions,
       limits,
       audit,
+      caches,
+      circuitBreakers,
+      health,
+      executor: createOperationExecutor({
+        limits,
+        audit,
+        caches,
+        circuitBreakers,
+        health,
+      }),
     });
     registry.subscribe((next) => {
       runtime?.updateSnapshot(next);
@@ -110,27 +153,63 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
     );
   }
 
-  const server = http.createServer((req, res) => {
-    if (req.method !== 'GET') {
-      sendJson(
-        res,
-        405,
-        { error: { code: 'USAGE', message: 'Method not allowed' } },
-        { allow: 'GET' },
-      );
+  const mcpServer = new McpServer(runtime);
+
+  const server = http.createServer(async (req, res) => {
+    if (req.method === 'GET') {
+      if (req.url === '/healthz') {
+        sendJson(res, 200, {
+          name: PACKAGE_NAME,
+          version: PRODUCT_VERSION,
+          status: 'ok',
+          authMode: options.authMode,
+          registryRevision: snapshot?.revision,
+        });
+        return;
+      }
+      sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found' } });
       return;
     }
-    if (req.url === '/healthz') {
-      sendJson(res, 200, {
-        name: PACKAGE_NAME,
-        version: PRODUCT_VERSION,
-        status: 'ok',
-        authMode: options.authMode,
-        registryRevision: snapshot?.revision,
-      });
-      return;
+    if (req.method === 'POST' && req.url === '/mcp') {
+      let bodyText: string;
+      try {
+        bodyText = await readBody(req, MAX_MCP_BODY_BYTES);
+      } catch {
+        sendJson(res, 413, {
+          error: { code: 'USAGE', message: 'Request body too large.' },
+        });
+        return;
+      }
+      try {
+        const response = await mcpServer.handleHttp(bodyText, req.headers);
+        if (response.body === '') {
+          res.writeHead(response.status, {
+            'content-type': response.contentType,
+          });
+          res.end();
+          return;
+        }
+        res.writeHead(response.status, {
+          'content-type': response.contentType,
+          'content-length': Buffer.byteLength(response.body),
+        });
+        res.end(response.body);
+        return;
+      } catch {
+        sendJson(res, 500, {
+          jsonrpc: '2.0',
+          id: null,
+          error: { code: -32603, message: 'Internal error' },
+        });
+        return;
+      }
     }
-    sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found' } });
+    sendJson(
+      res,
+      405,
+      { error: { code: 'USAGE', message: 'Method not allowed' } },
+      { allow: 'GET, POST' },
+    );
   });
 
   let watcher: fs.FSWatcher | undefined;
@@ -186,6 +265,7 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
       snapshot,
       identityProvider,
       runtime,
+      mcpServer,
       sessions,
       limits,
       audit,

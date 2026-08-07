@@ -134,7 +134,7 @@ describe('Phase 1 HTTP server', () => {
       method: 'POST',
     });
     expect(response.status).toBe(405);
-    expect(response.headers.get('allow')).toBe('GET');
+    expect(response.headers.get('allow')).toBe('GET, POST');
   });
 
   it('refuses non-loopback binding in unauthenticated mode', async () => {
