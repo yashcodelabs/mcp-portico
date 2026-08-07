@@ -10,6 +10,16 @@ export const CATALOG_VERSION = '2.0' as const;
 export const OVERLAY_VERSION = '1.0' as const;
 export const COMPILER_VERSION = '0.1.0' as const;
 
+/**
+ * AI-analysis confidence gate. AI-generated metadata (Phase 6) is inert until
+ * an operator reviews it: operations below this confidence, or whose
+ * authorization could not be resolved, compile as unavailable and therefore
+ * can never be executed or activated.
+ */
+export const AI_CONFIDENCE_THRESHOLD = 0.6;
+/** Fail-safe confidence when an AI document omits an explicit value. */
+export const AI_DEFAULT_CONFIDENCE = 0.5;
+
 export type HttpMethod =
   'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 
@@ -177,6 +187,14 @@ export interface NormalizedOperation {
   cache?: CatalogCachePolicy;
   redactions?: RedactionRule[];
   examples?: unknown[];
+  /** AI analysis confidence (0..1) for this operation (Phase 6 artifacts). */
+  aiConfidence?: number;
+  /**
+   * Authorization finding from AI analysis: "resolved" (a concrete security
+   * requirement was found), "unresolved" (uncertain -> unavailable), or
+   * "public" (no authorization found).
+   */
+  aiAuthStatus?: 'resolved' | 'unresolved' | 'public';
 }
 
 export interface NormalizedApiModel {
@@ -220,6 +238,8 @@ export interface CompileOptions {
   sourceType?: SourceType;
   sourceChecksum?: string;
   confidence?: number;
+  /** Provenance warnings supplied by the importer (e.g. AI analysis notes). */
+  warnings?: CatalogWarning[];
   now?: Date;
 }
 

@@ -315,6 +315,10 @@ catalog
   .option('--report <file>', 'import report output path (JSON, written atomically)')
   .option('--overlay <file>', 'policy overlay JSON file to apply during compilation')
   .option(
+    '--ai',
+    'mark the input as an AI-analysis artifact: read x-mcp-portico metadata and gate low-confidence or unresolved-auth operations as unavailable',
+  )
+  .option(
     '--allow-file-refs',
     'permit relative file $refs that stay inside the input directory',
   )
@@ -343,6 +347,7 @@ catalog
         output: string;
         report?: string;
         overlay?: string;
+        ai?: boolean;
         allowFileRefs?: boolean;
         allowRemoteRefs?: boolean;
         remoteHost: string[];
@@ -368,6 +373,7 @@ catalog
             : { kind: 'deny' };
         const { catalog, report } = await importOpenApi(file, {
           apiId: options.apiId,
+          sourceType: options.ai === true ? 'ai' : 'openapi',
           overlay,
           remoteRefs,
           limits: {

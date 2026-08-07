@@ -6,7 +6,12 @@
  * registry entry or connection.
  */
 
-import type { Catalog, CatalogWarning, PolicyOverlay } from '../../catalog/types';
+import type {
+  Catalog,
+  CatalogWarning,
+  PolicyOverlay,
+  SourceType,
+} from '../../catalog/types';
 
 export type ImportFormat = 'json' | 'yaml';
 
@@ -65,6 +70,13 @@ export type RemoteRefPolicy =
 export interface ImportOptions {
   /** Catalog API id, supplied explicitly by the operator. */
   apiId: string;
+  /**
+   * Provenance source type. `ai` marks the input as an AI-analysis artifact
+   * (Phase 6): the importer reads `x-mcp-portico` metadata, records AI
+   * confidence, and the compiler gates low-confidence or unresolved-auth
+   * operations as unavailable. Defaults to `openapi`.
+   */
+  sourceType?: SourceType;
   /** Optional policy overlay applied during compilation. */
   overlay?: PolicyOverlay;
   /** External `$ref` policy; defaults to deny. */
@@ -84,6 +96,9 @@ export interface UnsupportedFeature {
 
 export interface ImportReport {
   reportVersion: '1.0';
+  sourceType: SourceType;
+  /** Catalog-level confidence recorded in provenance (1 for OpenAPI input). */
+  confidence: number;
   source: {
     file: string;
     format: ImportFormat;

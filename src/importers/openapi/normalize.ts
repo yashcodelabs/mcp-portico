@@ -935,6 +935,7 @@ function buildOperation(
   pathKey: string,
   extras: OperationExtras,
 ): NormalizedOperation {
+  const aiExt = parseAiOperationExtension(op['x-mcp-portico']);
   const operationId = op.operationId;
   let normalizedId: string | undefined;
   if (typeof operationId === 'string' && operationId !== '') {
@@ -960,9 +961,36 @@ function buildOperation(
     ...(extras.examples !== undefined && extras.examples.length > 0
       ? { examples: extras.examples }
       : {}),
+    ...(aiExt?.confidence !== undefined ? { aiConfidence: aiExt.confidence } : {}),
+    ...(aiExt?.authStatus !== undefined ? { aiAuthStatus: aiExt.authStatus } : {}),
     security: extras.security,
   };
   return operation;
+}
+
+interface AiOperationExtension {
+  confidence?: number;
+  authStatus?: 'resolved' | 'unresolved' | 'public';
+}
+
+/**
+ * Parse the operation-level `x-mcp-portico` vendor extension used by AI
+ * analysis artifacts. Unknown or malformed values are ignored; range checks
+ * happen in the compiler so every path fails closed.
+ */
+function parseAiOperationExtension(
+  raw: unknown,
+): AiOperationExtension | undefined {
+  if (!isPlainObject(raw)) return undefined;
+  const out: AiOperationExtension = {};
+  if (typeof raw.confidence === 'number') {
+    out.confidence = raw.confidence;
+  }
+  const status = raw.authStatus;
+  if (status === 'resolved' || status === 'unresolved' || status === 'public') {
+    out.authStatus = status;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /**

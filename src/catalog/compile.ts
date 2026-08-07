@@ -2,7 +2,7 @@ import { CATALOG_CHECKSUM_EXCLUDE, checksum } from './canonical';
 import { deriveBodyKind } from './content';
 import { generateOperationId } from './ids';
 import { formatSchemaIssues, validateOverlaySchema } from './schema';
-import { COMPILER_VERSION } from './types';
+import { AI_CONFIDENCE_THRESHOLD, COMPILER_VERSION } from './types';
 import { validateCatalog } from './validate';
 import type {
   Catalog,
@@ -45,7 +45,22 @@ export function compileCatalog(
   options: CompileOptions = {},
 ): CompileResult {
   const errors: CatalogValidationIssue[] = [];
-  const warnings: CatalogWarning[] = [];
+  const warnings: CatalogWarning[] = [...(options.warnings ?? [])];
+  const isAi = options.sourceType === 'ai';
+
+  for (const operation of model.operations) {
+    if (
+      operation.aiConfidence !== undefined &&
+      (!Number.isFinite(operation.aiConfidence) ||
+        operation.aiConfidence < 0 ||
+        operation.aiConfidence > 1)
+    ) {
+      errors.push({
+        code: 'INVALID_AI_CONFIDENCE',
+        message: `operation ${operation.method} ${operation.path}: AI confidence must be a number between 0 and 1`,
+      });
+    }
+  }
 
   if (model.operations.length === 0) {
     errors.push({ code: 'EMPTY_MODEL', message: 'normalized model has no operations' });
@@ -91,12 +106,32 @@ export function compileCatalog(
     const operationId = ids.get(operation) as string;
     const policy = overlay?.operations[operationId];
     const security = operation.security ?? [];
-    const { available, securityWarnings } = resolveSecurity(
+    const { available: securityAvailable, securityWarnings } = resolveSecurity(
       operationId,
       security,
       securitySchemes,
     );
     warnings.push(...securityWarnings);
+    let available = securityAvailable;
+    if (isAi) {
+      if (operation.aiAuthStatus === 'unresolved') {
+        available = false;
+        warnings.push({
+          code: 'UNRESOLVED_AUTHORIZATION',
+          message: `operation ${operationId}: authorization could not be resolved during AI analysis; operation is unavailable`,
+        });
+      }
+      if (
+        operation.aiConfidence !== undefined &&
+        operation.aiConfidence < AI_CONFIDENCE_THRESHOLD
+      ) {
+        available = false;
+        warnings.push({
+          code: 'LOW_CONFIDENCE',
+          message: `operation ${operationId}: AI confidence ${operation.aiConfidence} is below the activation threshold ${AI_CONFIDENCE_THRESHOLD}; operation is unavailable`,
+        });
+      }
+    }
 
     const risk = policy?.risk ?? operation.risk ?? defaultRisk(operation.method);
     const confirmation =
