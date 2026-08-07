@@ -1,0 +1,246 @@
+openapi: 3.2.0
+info:
+  title: Express Orders API
+  version: 1.0.0
+servers:
+  - url: https://orders.example.com
+paths:
+  /health:
+    get:
+      operationId: health.get
+      summary: Service health
+      tags: [health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+      x-mcp-portico:
+        confidence: 0.95
+        authStatus: public
+  /orders:
+    get:
+      operationId: orders.list
+      summary: List orders
+      tags: [orders]
+      responses:
+        '200':
+          description: A list of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+      security:
+        - bearerAuth: []
+      x-mcp-portico:
+        confidence: 0.9
+        authStatus: resolved
+    post:
+      operationId: orders.create
+      summary: Create an order
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+      x-mcp-portico:
+        confidence: 0.85
+        authStatus: resolved
+  /orders/{orderId}:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: orders.get
+      summary: Get an order
+      tags: [orders]
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+      x-mcp-portico:
+        confidence: 0.9
+        authStatus: resolved
+    patch:
+      operationId: orders.update
+      summary: Update an order
+      tags: [orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderUpdate'
+      responses:
+        '200':
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+      x-mcp-portico:
+        confidence: 0.8
+        authStatus: resolved
+  /uploads:
+    post:
+      operationId: uploads.create
+      summary: Upload a file
+      tags: [uploads]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, filename, bytes]
+                properties:
+                  id:
+                    type: string
+                  filename:
+                    type: string
+                  bytes:
+                    type: integer
+      security:
+        - bearerAuth: []
+      x-mcp-portico:
+        confidence: 0.75
+        authStatus: resolved
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Order:
+      type: object
+      required: [id, customerEmail, status, totalCents, items]
+      properties:
+        id:
+          type: string
+        customerEmail:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, cancelled]
+        totalCents:
+          type: integer
+          minimum: 0
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+    OrderCreateRequest:
+      type: object
+      required: [customerEmail, items]
+      properties:
+        customerEmail:
+          type: string
+          format: email
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+    OrderUpdate:
+      type: object
+      properties:
+        customerEmail:
+          type: string
+          format: email
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, cancelled]
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+    OrderItem:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+x-mcp-portico:
+  confidence: 0.85
+  analyzer: mcp-portico-analyze
+  analyzerVersion: 0.1.0
+  repo: example/express-orders
+  commit: 9f4c2a7e1d6b
+  warnings:
+    - code: INFERRED_SCHEMA
+      message: Order schema inferred from src/schemas/order.js

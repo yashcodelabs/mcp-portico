@@ -1,0 +1,166 @@
+openapi: 3.2.0
+info:
+  title: FastAPI Tasks API
+  version: 1.0.0
+servers:
+  - url: https://tasks.example.com
+paths:
+  /health:
+    get:
+      operationId: health.get
+      summary: Service health
+      tags: [health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+      x-mcp-portico:
+        confidence: 0.95
+        authStatus: public
+  /tasks:
+    get:
+      operationId: tasks.list
+      summary: List tasks
+      tags: [tasks]
+      responses:
+        '200':
+          description: A list of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+      security:
+        - bearerAuth: []
+      x-mcp-portico:
+        confidence: 0.9
+        authStatus: resolved
+    post:
+      operationId: tasks.create
+      summary: Create a task
+      tags: [tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+      security:
+        - bearerAuth: []
+      x-mcp-portico:
+        confidence: 0.85
+        authStatus: resolved
+  /tasks/{taskId}:
+    parameters:
+      - name: taskId
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: tasks.get
+      summary: Get a task
+      tags: [tasks]
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+      x-mcp-portico:
+        confidence: 0.9
+        authStatus: resolved
+    delete:
+      operationId: tasks.delete
+      summary: Delete a task
+      tags: [tasks]
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+      x-mcp-portico:
+        confidence: 0.8
+        authStatus: resolved
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Task:
+      type: object
+      required: [id, title, completed, priority]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        completed:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+    TaskCreate:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        completed:
+          type: boolean
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 5
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+x-mcp-portico:
+  confidence: 0.9
+  analyzer: mcp-portico-analyze
+  analyzerVersion: 0.1.0
+  repo: example/fastapi-tasks
+  commit: 3b8d1e0c2a97
+  warnings:
+    - code: INFERRED_SCHEMA
+      message: Task schema inferred from app/models.py

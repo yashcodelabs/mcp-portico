@@ -1,0 +1,61 @@
+{
+  "reportVersion": "1.0",
+  "sourceType": "ai",
+  "confidence": 0.85,
+  "source": {
+    "file": "test/fixtures/analyze/express-orders/analysis/out/openapi.yaml",
+    "format": "yaml",
+    "spec": {
+      "kind": "openapi3",
+      "version": "3.2.0"
+    },
+    "sourceChecksum": "sha256:ca6ca8477a31ce2c5903bd4b90f9f34231e1ddf33196e1f68ce50ece54b09f88",
+    "bytes": 6058
+  },
+  "api": {
+    "id": "orders",
+    "title": "Express Orders API",
+    "version": "1.0.0"
+  },
+  "summary": {
+    "operations": 6,
+    "methods": {
+      "GET": 3,
+      "POST": 2,
+      "PATCH": 1
+    },
+    "tags": 3,
+    "securitySchemes": 1,
+    "contentTypes": {
+      "request": [
+        "application/json",
+        "multipart/form-data"
+      ],
+      "response": [
+        "application/json"
+      ]
+    }
+  },
+  "hints": {
+    "servers": [
+      "https://orders.example.com"
+    ],
+    "schemes": []
+  },
+  "unsupported": [],
+  "warnings": [
+    {
+      "code": "INFERRED_SCHEMA",
+      "message": "Order schema inferred from src/schemas/order.js"
+    }
+  ],
+  "overlay": {
+    "applied": true,
+    "operations": 6
+  },
+  "catalog": {
+    "checksum": "sha256:6cef4de3b7a604e7396e609bc986e4ae9b5062b8fc095581d47703ce8c50f8ca",
+    "operations": 6,
+    "available": 6
+  }
+}

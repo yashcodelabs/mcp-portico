@@ -10,11 +10,12 @@ MCP Portico turns OpenAPI descriptions or inspected backend source code into
 policy-controlled MCP connections. One deployment can expose multiple backend
 systems while isolating tenants, credentials, catalogs, and runtime sessions.
 
-> **Status:** Phases 1-5 complete: foundation and safety harness, catalog v2
+> **Status:** Phases 1-6 complete: foundation and safety harness, catalog v2
 > with the deterministic compiler, the tenant registry, connections, and
 > API-key authentication model, the OpenAPI/Swagger importers, and the fixed
-> MCP toolset with the operation runtime and generic transports. This
-> repository is a fresh implementation following the
+> MCP toolset with the operation runtime and generic transports, plus the AI
+> backend-analysis skill that feeds the same deterministic import pipeline.
+> This repository is a fresh implementation following the
 > [implementation plan](docs/mcp-portico-implementation-plan.md).
 
 ## Why MCP Portico
@@ -81,6 +82,7 @@ pnpm serve      # health server on http://127.0.0.1:3000
 ```text
 mcp-portico serve --registry <registry-file>      # implemented
 mcp-portico catalog import <openapi-file> --api-id <id> --output <catalog> --report <report>   # implemented
+mcp-portico catalog import <ai-openapi> --api-id <id> --ai --overlay <overlay> --output <catalog> --report <report>   # implemented (AI-analysis artifacts)
 mcp-portico catalog validate <catalog-file>       # implemented
 mcp-portico catalog diff <old> <new>              # implemented
 mcp-portico registry validate <registry-file>     # implemented
@@ -146,8 +148,8 @@ startup or connection activation.
 The [implementation plan](docs/mcp-portico-implementation-plan.md) defines
 seven phases: foundation (1, done), catalog v2 and the deterministic compiler
 (2, done), tenant registry and authentication (3, done), OpenAPI importers
-(4, done), the operation runtime (5, done), the AI backend-analysis skill (6, next),
-and the inspector plus clean cutover (7).
+(4, done), the operation runtime (5, done), the AI backend-analysis skill
+(6, done), and the inspector plus clean cutover (7, next).
 
 ## Contributing
 

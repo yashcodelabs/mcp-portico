@@ -1,0 +1,39 @@
+{
+  "reportVersion": "1.0",
+  "apiId": "tasks",
+  "repo": "example/fastapi-tasks",
+  "commit": "3b8d1e0c2a97",
+  "analyzedAt": "2026-08-07T00:00:00.000Z",
+  "frameworks": ["fastapi"],
+  "coverage": {
+    "discoveredRoutes": 5,
+    "modeledOperations": 5,
+    "uncoveredRoutes": [],
+    "dynamicRoutes": []
+  },
+  "auth": {
+    "resolved": ["tasks.list", "tasks.create", "tasks.get", "tasks.delete"],
+    "unresolved": [],
+    "public": ["health.get"]
+  },
+  "schemas": {
+    "inferred": ["Task"],
+    "explicit": ["TaskCreate"]
+  },
+  "confidence": {
+    "overall": 0.9,
+    "perOperation": {
+      "tasks.list": 0.9,
+      "tasks.create": 0.85,
+      "tasks.get": 0.9,
+      "tasks.delete": 0.8,
+      "health.get": 0.95
+    }
+  },
+  "warnings": [
+    {
+      "code": "INFERRED_SCHEMA",
+      "message": "Task schema inferred from app/models.py"
+    }
+  ]
+}

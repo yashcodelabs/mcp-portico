@@ -15,10 +15,7 @@ import type { ImportOptions } from '../../src/importers/openapi/types';
 
 const FIXED_NOW = new Date('2026-08-07T00:00:00.000Z');
 
-function writeTemp(
-  name: string,
-  content: string,
-): { dir: string; file: string } {
+function writeTemp(name: string, content: string): { dir: string; file: string } {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'portico-ai-'));
   const file = path.join(dir, name);
   writeFileSync(file, content, 'utf8');
@@ -80,10 +77,7 @@ function aiDocument(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify(doc, null, 2);
 }
 
-async function importAi(
-  content: string,
-  options: Partial<ImportOptions> = {},
-) {
+async function importAi(content: string, options: Partial<ImportOptions> = {}) {
   const { dir, file } = writeTemp('openapi.json', content);
   try {
     return await importOpenApi(file, {
@@ -145,9 +139,11 @@ describe('AI artifact import (--ai)', () => {
     const error = await importAi(JSON.stringify(doc)).catch((e: unknown) => e);
     expect(isPorticoError(error)).toBe(true);
     expect((error as { code: string }).code).toBe('CONFIG_ERROR');
-    const details = (error as {
-      details?: { issues?: Array<{ code: string }> };
-    }).details;
+    const details = (
+      error as {
+        details?: { issues?: Array<{ code: string }> };
+      }
+    ).details;
     expect(details?.issues?.map((i) => i.code)).toContain('AI_METADATA_REQUIRED');
   });
 
@@ -164,22 +160,21 @@ describe('AI artifact import (--ai)', () => {
   });
 
   it('rejects out-of-range root confidence', async () => {
-    const error = await importAi(
-      aiDocument({ confidence: 1.5 }),
-    ).catch((e: unknown) => e);
+    const error = await importAi(aiDocument({ confidence: 1.5 })).catch(
+      (e: unknown) => e,
+    );
     expect(isPorticoError(error)).toBe(true);
     expect(String((error as Error).message)).toContain('0 and 1');
   });
 
   it('rejects out-of-range operation confidence at compile time', async () => {
     const doc = JSON.parse(aiDocument()) as Record<string, unknown>;
-    (
-      (doc.paths as Record<string, unknown>)['/orders'] as Record<string, unknown>
-    ).get = {
-      operationId: 'orders.list',
-      responses: { 200: { description: 'ok' } },
-      'x-mcp-portico': { confidence: 2, authStatus: 'resolved' },
-    };
+    ((doc.paths as Record<string, unknown>)['/orders'] as Record<string, unknown>).get =
+      {
+        operationId: 'orders.list',
+        responses: { 200: { description: 'ok' } },
+        'x-mcp-portico': { confidence: 2, authStatus: 'resolved' },
+      };
     const error = await importAi(JSON.stringify(doc)).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(CompileError);
     expect((error as CompileError).issues.map((i) => i.code)).toContain(
@@ -188,9 +183,9 @@ describe('AI artifact import (--ai)', () => {
   });
 
   it('rejects malformed root warnings entries', async () => {
-    const error = await importAi(
-      aiDocument({ warnings: [{ code: 42 }] }),
-    ).catch((e: unknown) => e);
+    const error = await importAi(aiDocument({ warnings: [{ code: 42 }] })).catch(
+      (e: unknown) => e,
+    );
     expect(isPorticoError(error)).toBe(true);
     expect(String((error as Error).message)).toContain('warnings');
   });

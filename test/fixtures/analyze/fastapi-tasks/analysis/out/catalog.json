@@ -1,0 +1,389 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "tasks",
+    "title": "FastAPI Tasks API",
+    "version": "1.0.0"
+  },
+  "provenance": {
+    "sourceType": "ai",
+    "sourceChecksum": "sha256:f3e341d0e26dcc873a08759687080bdf17ac581603847c74cf06ad7d39e2b13b",
+    "generatedAt": "2026-08-07T14:21:31.773Z",
+    "compilerVersion": "0.1.0",
+    "confidence": 0.9,
+    "warnings": [
+      {
+        "code": "INFERRED_SCHEMA",
+        "message": "Task schema inferred from app/models.py"
+      }
+    ]
+  },
+  "checksum": "sha256:5b9937e014541b00fcdcf471f7db0c3237dffe1717a106c3fa6195ba980697eb",
+  "securitySchemes": {
+    "bearerAuth": {
+      "type": "http",
+      "scheme": "bearer"
+    }
+  },
+  "operations": {
+    "health.get": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/health",
+      "summary": "Service health",
+      "tags": [
+        "health"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [],
+      "responses": {
+        "200": {
+          "description": "Service is healthy",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "type": "object",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ok"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "tasks.list": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/tasks",
+      "summary": "List tasks",
+      "tags": [
+        "tasks"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ]
+      ],
+      "responses": {
+        "200": {
+          "description": "A list of tasks",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/components_schemas_Task"
+            },
+            "$defs": {
+              "components_schemas_Task": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "title",
+                  "completed",
+                  "priority"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "completed": {
+                    "type": "boolean"
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tasks.create": {
+      "enabled": true,
+      "available": true,
+      "method": "POST",
+      "path": "/tasks",
+      "summary": "Create a task",
+      "description": "Create a task. The backend assigns the task id.",
+      "tags": [
+        "tasks"
+      ],
+      "risk": "write",
+      "confirmation": "write",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ]
+      ],
+      "request": {
+        "body": {
+          "kind": "json",
+          "contentTypes": [
+            "application/json"
+          ],
+          "required": true,
+          "schema": {
+            "$ref": "#/$defs/components_schemas_TaskCreate",
+            "$defs": {
+              "components_schemas_TaskCreate": {
+                "type": "object",
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "completed": {
+                    "type": "boolean"
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Task",
+            "$defs": {
+              "components_schemas_Task": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "title",
+                  "completed",
+                  "priority"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "completed": {
+                    "type": "boolean"
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tasks.get": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/tasks/{taskId}",
+      "summary": "Get a task",
+      "tags": [
+        "tasks"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ]
+      ],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "taskId",
+              "required": true,
+              "schema": {
+                "type": "integer"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Task details",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Task",
+            "$defs": {
+              "components_schemas_Task": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "title",
+                  "completed",
+                  "priority"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "completed": {
+                    "type": "boolean"
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  }
+                }
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not found",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Error",
+            "$defs": {
+              "components_schemas_Error": {
+                "type": "object",
+                "required": [
+                  "detail"
+                ],
+                "properties": {
+                  "detail": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tasks.delete": {
+      "enabled": true,
+      "available": true,
+      "method": "DELETE",
+      "path": "/tasks/{taskId}",
+      "summary": "Delete a task",
+      "tags": [
+        "tasks"
+      ],
+      "risk": "destructive",
+      "confirmation": "destructive",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ]
+      ],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "taskId",
+              "required": true,
+              "schema": {
+                "type": "integer"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "204": {
+          "description": "Deleted"
+        },
+        "404": {
+          "description": "Not found",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Error",
+            "$defs": {
+              "components_schemas_Error": {
+                "type": "object",
+                "required": [
+                  "detail"
+                ],
+                "properties": {
+                  "detail": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

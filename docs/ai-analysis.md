@@ -68,11 +68,11 @@ Operation-level `x-mcp-portico` object on every operation:
 
 `authStatus` values:
 
-| Value        | Meaning                                                  |
-| ------------ | -------------------------------------------------------- |
-| `resolved`   | A concrete security requirement was found in the repo.   |
+| Value        | Meaning                                                      |
+| ------------ | ------------------------------------------------------------ |
+| `resolved`   | A concrete security requirement was found in the repo.       |
 | `unresolved` | Authorization could not be determined; compiled unavailable. |
-| `public`     | No authorization was found for the route.                |
+| `public`     | No authorization was found for the route.                    |
 
 Rules:
 

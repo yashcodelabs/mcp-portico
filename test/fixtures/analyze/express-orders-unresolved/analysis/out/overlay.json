@@ -1,0 +1,27 @@
+{
+  "overlayVersion": "1.0",
+  "apiId": "orders-unresolved",
+  "description": "Reviewed policy overlay for the express-orders-unresolved analysis artifacts.",
+  "operations": {
+    "orders.list": {
+      "risk": "read"
+    },
+    "orders.get": {
+      "risk": "read",
+      "redactions": [{ "fields": ["customerEmail"] }]
+    },
+    "orders.create": {
+      "risk": "write",
+      "description": "Create a new order. The backend assigns the order id and status."
+    },
+    "orders.update": {
+      "risk": "write"
+    },
+    "uploads.create": {
+      "risk": "write"
+    },
+    "health.get": {
+      "risk": "read"
+    }
+  }
+}

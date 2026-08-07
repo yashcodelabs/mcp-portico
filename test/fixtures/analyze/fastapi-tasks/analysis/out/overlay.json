@@ -1,0 +1,23 @@
+{
+  "overlayVersion": "1.0",
+  "apiId": "tasks",
+  "description": "Reviewed policy overlay for the fastapi-tasks analysis artifacts.",
+  "operations": {
+    "tasks.list": {
+      "risk": "read"
+    },
+    "tasks.create": {
+      "risk": "write",
+      "description": "Create a task. The backend assigns the task id."
+    },
+    "tasks.get": {
+      "risk": "read"
+    },
+    "tasks.delete": {
+      "risk": "destructive"
+    },
+    "health.get": {
+      "risk": "read"
+    }
+  }
+}

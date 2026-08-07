@@ -1,0 +1,49 @@
+{
+  "reportVersion": "1.0",
+  "apiId": "orders-unresolved",
+  "repo": "example/express-orders",
+  "commit": "9f4c2a7e1d6b",
+  "analyzedAt": "2026-08-07T00:00:00.000Z",
+  "frameworks": ["express"],
+  "coverage": {
+    "discoveredRoutes": 6,
+    "modeledOperations": 6,
+    "uncoveredRoutes": [],
+    "dynamicRoutes": []
+  },
+  "auth": {
+    "resolved": [
+      "orders.list",
+      "orders.create",
+      "orders.update",
+      "uploads.create"
+    ],
+    "unresolved": ["orders.get"],
+    "public": ["health.get"]
+  },
+  "schemas": {
+    "inferred": ["Order", "OrderItem", "OrderUpdate"],
+    "explicit": ["OrderCreateRequest"]
+  },
+  "confidence": {
+    "overall": 0.7,
+    "perOperation": {
+      "orders.list": 0.9,
+      "orders.get": 0.9,
+      "orders.create": 0.85,
+      "orders.update": 0.5,
+      "uploads.create": 0.75,
+      "health.get": 0.95
+    }
+  },
+  "warnings": [
+    {
+      "code": "INFERRED_SCHEMA",
+      "message": "Order schema inferred from src/schemas/order.js"
+    },
+    {
+      "code": "UNRESOLVED_AUTHORIZATION",
+      "message": "Authorization for orders.get could not be determined from the repository"
+    }
+  ]
+}

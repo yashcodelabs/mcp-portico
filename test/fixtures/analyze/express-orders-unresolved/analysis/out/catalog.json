@@ -1,0 +1,721 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "orders-unresolved",
+    "title": "Express Orders API",
+    "version": "1.0.0"
+  },
+  "provenance": {
+    "sourceType": "ai",
+    "sourceChecksum": "sha256:0bcf13c8272ad1aa11e3c8c6bca6b033cf16214e41e0c48ac34c491430017ea1",
+    "generatedAt": "2026-08-07T14:22:10.115Z",
+    "compilerVersion": "0.1.0",
+    "confidence": 0.7,
+    "warnings": [
+      {
+        "code": "INFERRED_SCHEMA",
+        "message": "Order schema inferred from src/schemas/order.js"
+      },
+      {
+        "code": "UNRESOLVED_AUTHORIZATION",
+        "message": "operation orders.get: authorization could not be resolved during AI analysis; operation is unavailable"
+      },
+      {
+        "code": "LOW_CONFIDENCE",
+        "message": "operation orders.update: AI confidence 0.5 is below the activation threshold 0.6; operation is unavailable"
+      }
+    ]
+  },
+  "checksum": "sha256:8f183873b3b5f18a18cad4c9a977323ca41dd45fbd36f33c09e6a6b86ee5f73a",
+  "securitySchemes": {
+    "bearerAuth": {
+      "type": "http",
+      "scheme": "bearer"
+    }
+  },
+  "operations": {
+    "health.get": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/health",
+      "summary": "Service health",
+      "tags": [
+        "health"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [],
+      "responses": {
+        "200": {
+          "description": "Service is healthy",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "type": "object",
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "ok"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "orders.list": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/orders",
+      "summary": "List orders",
+      "tags": [
+        "orders"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ]
+      ],
+      "responses": {
+        "200": {
+          "description": "A list of orders",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/components_schemas_Order"
+            },
+            "$defs": {
+              "components_schemas_Order": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "customerEmail",
+                  "status",
+                  "totalCents",
+                  "items"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "customerEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "confirmed",
+                      "shipped",
+                      "cancelled"
+                    ]
+                  },
+                  "totalCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/components_schemas_OrderItem"
+                    }
+                  }
+                }
+              },
+              "components_schemas_OrderItem": {
+                "type": "object",
+                "required": [
+                  "productId",
+                  "quantity"
+                ],
+                "properties": {
+                  "productId": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "orders.create": {
+      "enabled": true,
+      "available": true,
+      "method": "POST",
+      "path": "/orders",
+      "summary": "Create an order",
+      "description": "Create a new order. The backend assigns the order id and status.",
+      "tags": [
+        "orders"
+      ],
+      "risk": "write",
+      "confirmation": "write",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ]
+      ],
+      "request": {
+        "body": {
+          "kind": "json",
+          "contentTypes": [
+            "application/json"
+          ],
+          "required": true,
+          "schema": {
+            "$ref": "#/$defs/components_schemas_OrderCreateRequest",
+            "$defs": {
+              "components_schemas_OrderCreateRequest": {
+                "type": "object",
+                "required": [
+                  "customerEmail",
+                  "items"
+                ],
+                "properties": {
+                  "customerEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/$defs/components_schemas_OrderItem"
+                    }
+                  }
+                }
+              },
+              "components_schemas_OrderItem": {
+                "type": "object",
+                "required": [
+                  "productId",
+                  "quantity"
+                ],
+                "properties": {
+                  "productId": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Created",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Order",
+            "$defs": {
+              "components_schemas_Order": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "customerEmail",
+                  "status",
+                  "totalCents",
+                  "items"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "customerEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "confirmed",
+                      "shipped",
+                      "cancelled"
+                    ]
+                  },
+                  "totalCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/components_schemas_OrderItem"
+                    }
+                  }
+                }
+              },
+              "components_schemas_OrderItem": {
+                "type": "object",
+                "required": [
+                  "productId",
+                  "quantity"
+                ],
+                "properties": {
+                  "productId": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Validation error",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Error",
+            "$defs": {
+              "components_schemas_Error": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "message"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "orders.get": {
+      "enabled": true,
+      "available": false,
+      "method": "GET",
+      "path": "/orders/{orderId}",
+      "summary": "Get an order",
+      "tags": [
+        "orders"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ]
+      ],
+      "redactions": [
+        {
+          "fields": [
+            "customerEmail"
+          ]
+        }
+      ],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "orderId",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Order details",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Order",
+            "$defs": {
+              "components_schemas_Order": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "customerEmail",
+                  "status",
+                  "totalCents",
+                  "items"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "customerEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "confirmed",
+                      "shipped",
+                      "cancelled"
+                    ]
+                  },
+                  "totalCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/components_schemas_OrderItem"
+                    }
+                  }
+                }
+              },
+              "components_schemas_OrderItem": {
+                "type": "object",
+                "required": [
+                  "productId",
+                  "quantity"
+                ],
+                "properties": {
+                  "productId": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not found",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Error",
+            "$defs": {
+              "components_schemas_Error": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "message"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "orders.update": {
+      "enabled": true,
+      "available": false,
+      "method": "PATCH",
+      "path": "/orders/{orderId}",
+      "summary": "Update an order",
+      "tags": [
+        "orders"
+      ],
+      "risk": "write",
+      "confirmation": "write",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ]
+      ],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "orderId",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "body": {
+          "kind": "json",
+          "contentTypes": [
+            "application/json"
+          ],
+          "required": true,
+          "schema": {
+            "$ref": "#/$defs/components_schemas_OrderUpdate",
+            "$defs": {
+              "components_schemas_OrderUpdate": {
+                "type": "object",
+                "properties": {
+                  "customerEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "confirmed",
+                      "shipped",
+                      "cancelled"
+                    ]
+                  },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/$defs/components_schemas_OrderItem"
+                    }
+                  }
+                }
+              },
+              "components_schemas_OrderItem": {
+                "type": "object",
+                "required": [
+                  "productId",
+                  "quantity"
+                ],
+                "properties": {
+                  "productId": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Updated order",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Order",
+            "$defs": {
+              "components_schemas_Order": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "customerEmail",
+                  "status",
+                  "totalCents",
+                  "items"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "customerEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "confirmed",
+                      "shipped",
+                      "cancelled"
+                    ]
+                  },
+                  "totalCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/components_schemas_OrderItem"
+                    }
+                  }
+                }
+              },
+              "components_schemas_OrderItem": {
+                "type": "object",
+                "required": [
+                  "productId",
+                  "quantity"
+                ],
+                "properties": {
+                  "productId": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not found",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Error",
+            "$defs": {
+              "components_schemas_Error": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "message"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "uploads.create": {
+      "enabled": true,
+      "available": true,
+      "method": "POST",
+      "path": "/uploads",
+      "summary": "Upload a file",
+      "tags": [
+        "uploads"
+      ],
+      "risk": "write",
+      "confirmation": "write",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ]
+      ],
+      "request": {
+        "body": {
+          "kind": "multipart",
+          "contentTypes": [
+            "multipart/form-data"
+          ],
+          "required": true,
+          "schema": {
+            "type": "object",
+            "required": [
+              "file"
+            ],
+            "properties": {
+              "file": {
+                "type": "string",
+                "format": "binary"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "Uploaded",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "type": "object",
+            "required": [
+              "id",
+              "filename",
+              "bytes"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "filename": {
+                "type": "string"
+              },
+              "bytes": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

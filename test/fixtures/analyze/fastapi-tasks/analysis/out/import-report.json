@@ -1,0 +1,60 @@
+{
+  "reportVersion": "1.0",
+  "sourceType": "ai",
+  "confidence": 0.9,
+  "source": {
+    "file": "test/fixtures/analyze/fastapi-tasks/analysis/out/openapi.yaml",
+    "format": "yaml",
+    "spec": {
+      "kind": "openapi3",
+      "version": "3.2.0"
+    },
+    "sourceChecksum": "sha256:f3e341d0e26dcc873a08759687080bdf17ac581603847c74cf06ad7d39e2b13b",
+    "bytes": 3840
+  },
+  "api": {
+    "id": "tasks",
+    "title": "FastAPI Tasks API",
+    "version": "1.0.0"
+  },
+  "summary": {
+    "operations": 5,
+    "methods": {
+      "GET": 3,
+      "POST": 1,
+      "DELETE": 1
+    },
+    "tags": 2,
+    "securitySchemes": 1,
+    "contentTypes": {
+      "request": [
+        "application/json"
+      ],
+      "response": [
+        "application/json"
+      ]
+    }
+  },
+  "hints": {
+    "servers": [
+      "https://tasks.example.com"
+    ],
+    "schemes": []
+  },
+  "unsupported": [],
+  "warnings": [
+    {
+      "code": "INFERRED_SCHEMA",
+      "message": "Task schema inferred from app/models.py"
+    }
+  ],
+  "overlay": {
+    "applied": true,
+    "operations": 5
+  },
+  "catalog": {
+    "checksum": "sha256:5b9937e014541b00fcdcf471f7db0c3237dffe1717a106c3fa6195ba980697eb",
+    "operations": 5,
+    "available": 5
+  }
+}

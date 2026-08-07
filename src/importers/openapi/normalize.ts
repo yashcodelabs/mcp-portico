@@ -978,9 +978,7 @@ interface AiOperationExtension {
  * analysis artifacts. Unknown or malformed values are ignored; range checks
  * happen in the compiler so every path fails closed.
  */
-function parseAiOperationExtension(
-  raw: unknown,
-): AiOperationExtension | undefined {
+function parseAiOperationExtension(raw: unknown): AiOperationExtension | undefined {
   if (!isPlainObject(raw)) return undefined;
   const out: AiOperationExtension = {};
   if (typeof raw.confidence === 'number') {

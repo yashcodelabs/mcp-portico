@@ -1,0 +1,69 @@
+{
+  "reportVersion": "1.0",
+  "sourceType": "ai",
+  "confidence": 0.7,
+  "source": {
+    "file": "test/fixtures/analyze/express-orders-unresolved/analysis/out/openapi.yaml",
+    "format": "yaml",
+    "spec": {
+      "kind": "openapi3",
+      "version": "3.2.0"
+    },
+    "sourceChecksum": "sha256:0bcf13c8272ad1aa11e3c8c6bca6b033cf16214e41e0c48ac34c491430017ea1",
+    "bytes": 6059
+  },
+  "api": {
+    "id": "orders-unresolved",
+    "title": "Express Orders API",
+    "version": "1.0.0"
+  },
+  "summary": {
+    "operations": 6,
+    "methods": {
+      "GET": 3,
+      "POST": 2,
+      "PATCH": 1
+    },
+    "tags": 3,
+    "securitySchemes": 1,
+    "contentTypes": {
+      "request": [
+        "application/json",
+        "multipart/form-data"
+      ],
+      "response": [
+        "application/json"
+      ]
+    }
+  },
+  "hints": {
+    "servers": [
+      "https://orders.example.com"
+    ],
+    "schemes": []
+  },
+  "unsupported": [],
+  "warnings": [
+    {
+      "code": "INFERRED_SCHEMA",
+      "message": "Order schema inferred from src/schemas/order.js"
+    },
+    {
+      "code": "UNRESOLVED_AUTHORIZATION",
+      "message": "operation orders.get: authorization could not be resolved during AI analysis; operation is unavailable"
+    },
+    {
+      "code": "LOW_CONFIDENCE",
+      "message": "operation orders.update: AI confidence 0.5 is below the activation threshold 0.6; operation is unavailable"
+    }
+  ],
+  "overlay": {
+    "applied": true,
+    "operations": 6
+  },
+  "catalog": {
+    "checksum": "sha256:8f183873b3b5f18a18cad4c9a977323ca41dd45fbd36f33c09e6a6b86ee5f73a",
+    "operations": 6,
+    "available": 4
+  }
+}
