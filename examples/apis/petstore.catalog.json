@@ -1,0 +1,468 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "petstore",
+    "title": "Petstore Lite API",
+    "version": "1.0.0"
+  },
+  "provenance": {
+    "sourceType": "openapi",
+    "sourceChecksum": "sha256:9a58f0395e8b3357589c8813023343fcee33f646b74cf30a5ab5a6143d05d137",
+    "generatedAt": "2026-08-08T16:38:38.340Z",
+    "compilerVersion": "0.1.0",
+    "confidence": 1,
+    "warnings": [
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation pets.list risk inferred as \"read\" from method GET"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation pets.create risk inferred as \"write\" from method POST"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation pets.get risk inferred as \"read\" from method GET"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation pets.delete risk inferred as \"destructive\" from method DELETE"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation health.get risk inferred as \"read\" from method GET"
+      }
+    ]
+  },
+  "checksum": "sha256:7d41ead49443b3bf2865304e0a455fa74baef7efadf307ee075ff52a105bb191",
+  "securitySchemes": {
+    "bearerAuth": {
+      "type": "http",
+      "scheme": "bearer"
+    }
+  },
+  "operations": {
+    "pets.list": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/pets",
+      "summary": "List pets",
+      "description": "Returns pets, optionally filtered by tag and limited in count.",
+      "tags": [
+        "pets"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ],
+        []
+      ],
+      "request": {
+        "parameters": {
+          "query": [
+            {
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "description": "Maximum number of pets to return.",
+              "schema": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 1,
+                "maximum": 100
+              }
+            },
+            {
+              "in": "query",
+              "name": "tag",
+              "required": false,
+              "description": "Only return pets with this tag.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "A list of pets.",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/components_schemas_Pet"
+            },
+            "$defs": {
+              "components_schemas_Pet": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Server-assigned pet identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Pet name."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional classification tag."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "default": {
+          "description": "Unexpected error.",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Error",
+            "$defs": {
+              "components_schemas_Error": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "message"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "Machine-readable error code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Human-readable error message."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pets.create": {
+      "enabled": true,
+      "available": true,
+      "method": "POST",
+      "path": "/pets",
+      "summary": "Create a pet",
+      "description": "Creates a new pet and returns it with a server-assigned id.",
+      "tags": [
+        "pets"
+      ],
+      "risk": "write",
+      "confirmation": "write",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ],
+        []
+      ],
+      "request": {
+        "body": {
+          "kind": "json",
+          "contentTypes": [
+            "application/json"
+          ],
+          "required": true,
+          "schema": {
+            "$ref": "#/$defs/components_schemas_NewPet",
+            "$defs": {
+              "components_schemas_NewPet": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Pet name."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional classification tag."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "The created pet.",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Pet",
+            "$defs": {
+              "components_schemas_Pet": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Server-assigned pet identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Pet name."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional classification tag."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid pet payload.",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Error",
+            "$defs": {
+              "components_schemas_Error": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "message"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "Machine-readable error code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Human-readable error message."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pets.get": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/pets/{petId}",
+      "summary": "Get a pet",
+      "description": "Returns a single pet by id.",
+      "tags": [
+        "pets"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ],
+        []
+      ],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "petId",
+              "required": true,
+              "description": "The pet identifier.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Pet details.",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Pet",
+            "$defs": {
+              "components_schemas_Pet": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "Server-assigned pet identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Pet name."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional classification tag."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Pet not found.",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Error",
+            "$defs": {
+              "components_schemas_Error": {
+                "type": "object",
+                "required": [
+                  "code",
+                  "message"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "integer",
+                    "description": "Machine-readable error code."
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Human-readable error message."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "pets.delete": {
+      "enabled": true,
+      "available": true,
+      "method": "DELETE",
+      "path": "/pets/{petId}",
+      "summary": "Delete a pet",
+      "description": "Deletes a pet by id.",
+      "tags": [
+        "pets"
+      ],
+      "risk": "destructive",
+      "confirmation": "destructive",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [
+        [
+          "bearerAuth"
+        ],
+        []
+      ],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "petId",
+              "required": true,
+              "description": "The pet identifier.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "204": {
+          "description": "Deleted."
+        }
+      }
+    },
+    "health.get": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/health",
+      "summary": "Service health",
+      "description": "Public liveness check; no authentication required.",
+      "tags": [
+        "health"
+      ],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [],
+      "responses": {
+        "200": {
+          "description": "Service is healthy.",
+          "contentTypes": [
+            "application/json"
+          ],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Health",
+            "$defs": {
+              "components_schemas_Health": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ok"
+                    ],
+                    "description": "Liveness status."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

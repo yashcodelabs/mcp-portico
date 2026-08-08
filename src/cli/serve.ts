@@ -11,6 +11,7 @@ import {
 import type { IdentityProvider } from '../auth/types';
 import { MemoryAuditLog, type AuditLog } from '../audit/log';
 import { StaticBearerIdentityProvider } from '../identity/static-bearer';
+import { Inspector } from '../inspector/server';
 import { LimitsStore } from '../limits/store';
 import { McpServer } from '../mcp/server';
 import {
@@ -42,6 +43,7 @@ export interface ServerContext {
   identityProvider?: IdentityProvider;
   runtime?: TenantRuntime;
   mcpServer?: McpServer;
+  inspector?: Inspector;
   sessions: SessionStore;
   limits: LimitsStore;
   audit: AuditLog;
@@ -154,8 +156,17 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
   }
 
   const mcpServer = new McpServer(runtime);
+  const inspector = new Inspector({
+    runtime,
+    audit,
+    authMode: options.authMode,
+  });
 
   const server = http.createServer(async (req, res) => {
+    if (req.url !== undefined && req.url.startsWith('/inspector')) {
+      const handled = await inspector.handle(req, res);
+      if (handled) return;
+    }
     if (req.method === 'GET') {
       if (req.url === '/healthz') {
         sendJson(res, 200, {
@@ -266,6 +277,7 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
       identityProvider,
       runtime,
       mcpServer,
+      inspector,
       sessions,
       limits,
       audit,

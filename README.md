@@ -10,12 +10,13 @@ MCP Portico turns OpenAPI descriptions or inspected backend source code into
 policy-controlled MCP connections. One deployment can expose multiple backend
 systems while isolating tenants, credentials, catalogs, and runtime sessions.
 
-> **Status:** Phases 1-6 complete: foundation and safety harness, catalog v2
+> **Status:** Phases 1-7 complete, v1 ready: foundation and safety harness, catalog v2
 > with the deterministic compiler, the tenant registry, connections, and
 > API-key authentication model, the OpenAPI/Swagger importers, and the fixed
 > MCP toolset with the operation runtime and generic transports, plus the AI
-> backend-analysis skill that feeds the same deterministic import pipeline.
-> This repository is a fresh implementation following the
+> backend-analysis skill, the read-only tenant-scoped inspector, examples,
+> migration notes, and release packaging. This repository is a fresh
+> implementation following the
 > [implementation plan](docs/mcp-portico-implementation-plan.md).
 
 ## Why MCP Portico
@@ -145,11 +146,9 @@ startup or connection activation.
 
 ## What's next
 
-The [implementation plan](docs/mcp-portico-implementation-plan.md) defines
-seven phases: foundation (1, done), catalog v2 and the deterministic compiler
-(2, done), tenant registry and authentication (3, done), OpenAPI importers
-(4, done), the operation runtime (5, done), the AI backend-analysis skill
-(6, done), and the inspector plus clean cutover (7, next).
+All seven phases of the [implementation plan](docs/mcp-portico-implementation-plan.md)
+are complete. Post-v1 roadmap items include MCP OAuth 2.1 authorization-server
+integration, database-backed administration, and multi-replica shared state.
 
 ## Contributing
 

@@ -1,9 +1,16 @@
 {
   "name": "mcp-portico",
   "version": "0.1.0",
-  "private": true,
   "description": "MCP Portico - a generic, multi-tenant MCP frontend for HTTP APIs",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yashcodelabs/mcp-portico.git"
+  },
+  "homepage": "https://github.com/yashcodelabs/mcp-portico",
+  "bugs": {
+    "url": "https://github.com/yashcodelabs/mcp-portico/issues"
+  },
   "keywords": [
     "mcp",
     "openapi",
@@ -24,6 +31,10 @@
     "node": ">=22"
   },
   "packageManager": "pnpm@11.9.0",
+  "publishConfig": {
+    "access": "public",
+    "provenance": false
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -37,10 +48,12 @@
     "sweep:brand": "node scripts/sweep.mjs --brand",
     "sweep:secrets": "node scripts/sweep.mjs --secrets",
     "smoke": "node scripts/smoke-cli.mjs",
+    "test:pack": "node scripts/smoke-pack.mjs",
+    "audit:deps": "npm audit --omit=dev",
     "cli": "tsx src/cli/index.ts",
     "mcp-portico": "tsx src/cli/index.ts",
     "serve": "tsx src/cli/index.ts serve",
-    "ci:check": "pnpm typecheck && pnpm format:check && pnpm test && pnpm test:fixtures && pnpm sweep && pnpm build && pnpm smoke"
+    "ci:check": "pnpm typecheck && pnpm format:check && pnpm test && pnpm test:fixtures && pnpm sweep && pnpm build && pnpm smoke && pnpm test:pack"
   },
   "dependencies": {
     "ajv": "^8.20.0",

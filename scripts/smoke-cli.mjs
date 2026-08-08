@@ -11,6 +11,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import {
   copyFileSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -221,10 +222,15 @@ function assertRegistry() {
 function assertKeyCreate() {
   const directory = mkdtempSync(join(os.tmpdir(), 'portico-smoke-key-'));
   const registry = join(directory, 'sample-registry.yaml');
+  mkdirSync(join(directory, 'apis'), { recursive: true });
   copyFileSync(join(ROOT, 'examples', 'sample-registry.yaml'), registry);
   copyFileSync(
     join(ROOT, 'examples', 'sample-catalog.json'),
     join(directory, 'sample-catalog.json'),
+  );
+  copyFileSync(
+    join(ROOT, 'examples', 'apis', 'petstore.catalog.json'),
+    join(directory, 'apis', 'petstore.catalog.json'),
   );
   try {
     const created = spawnSync(
@@ -287,9 +293,14 @@ function assertKeyCreate() {
     const rollbackDirectory = mkdtempSync(
       join(os.tmpdir(), 'portico-smoke-key-rollback-'),
     );
+    mkdirSync(join(rollbackDirectory, 'apis'), { recursive: true });
     copyFileSync(
       join(ROOT, 'examples', 'sample-catalog.json'),
       join(rollbackDirectory, 'sample-catalog.json'),
+    );
+    copyFileSync(
+      join(ROOT, 'examples', 'apis', 'petstore.catalog.json'),
+      join(rollbackDirectory, 'apis', 'petstore.catalog.json'),
     );
     const sample = JSON.parse(
       readFileSync(join(ROOT, 'examples', 'sample-registry.json'), 'utf8'),

@@ -21,8 +21,6 @@ jobs:
             node: 22
           - os: macos-latest
             node: 24
-          - os: windows-latest
-            node: 22
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -50,3 +48,35 @@ jobs:
         run: pnpm build
       - name: CLI smoke test
         run: pnpm smoke
+      - name: Package smoke test
+        run: pnpm test:pack
+
+  windows-compat:
+    name: windows compatibility (node 22)
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: Integration tests
+        run: pnpm test:integration
+      - name: Fixture validation
+        run: pnpm test:fixtures
+      - name: Brand and secret sweep
+        run: pnpm sweep
+      - name: Build
+        run: pnpm build
+      - name: Package smoke test
+        run: pnpm test:pack

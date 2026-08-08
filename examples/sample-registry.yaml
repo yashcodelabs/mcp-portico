@@ -10,26 +10,37 @@ principals:
   - id: acme-automation
     tenantId: acme
     allowedConnectionIds:
+      - acme-petstore-prod
       - acme-billing-prod
+      - acme-petstore-public
+      - acme-petstore-partner
   - id: globex-automation
     tenantId: globex
     allowedConnectionIds:
+      - globex-petstore-prod
       - globex-billing-prod
+      - globex-petstore-basic
 
 backends:
+  - id: petstore
+    title: Petstore Lite API
+    scope: global
+    catalogRef: ./apis/petstore.catalog.json
+    catalogChecksum: sha256:7d41ead49443b3bf2865304e0a455fa74baef7efadf307ee075ff52a105bb191
   - id: billing
     title: Billing API
     scope: global
     catalogRef: ./sample-catalog.json
     catalogChecksum: sha256:6d58295e29802224dad1624bb8b4c1e22c45433d32f91c69216c76ff5d87ed0d
-  - id: acme-ledger
-    title: Acme Ledger
-    scope: tenant
-    ownerTenantId: acme
-    catalogRef: ./sample-catalog.json
-    catalogChecksum: sha256:6d58295e29802224dad1624bb8b4c1e22c45433d32f91c69216c76ff5d87ed0d
 
 connections:
+  - id: acme-petstore-prod
+    tenantId: acme
+    backendId: petstore
+    baseUrl: https://example.com
+    auth:
+      type: bearer
+      tokenRef: env:ACME_PETSTORE_TOKEN
   - id: acme-billing-prod
     tenantId: acme
     backendId: billing
@@ -50,6 +61,27 @@ connections:
       rateLimitPerMinute: 120
       allowedContentTypes:
         - application/json
+  - id: acme-petstore-public
+    tenantId: acme
+    backendId: petstore
+    baseUrl: https://example.com
+    auth:
+      type: none
+  - id: acme-petstore-partner
+    tenantId: acme
+    backendId: petstore
+    baseUrl: https://example.com
+    auth:
+      type: staticHeaders
+      headers:
+        X-Partner-Key: env:ACME_PETSTORE_PARTNER_KEY
+  - id: globex-petstore-prod
+    tenantId: globex
+    backendId: petstore
+    baseUrl: https://example.com
+    auth:
+      type: bearer
+      tokenRef: env:GLOBEX_PETSTORE_TOKEN
   - id: globex-billing-prod
     tenantId: globex
     backendId: billing
@@ -59,16 +91,11 @@ connections:
       in: query
       name: api_key
       valueRef: env:GLOBEX_BILLING_API_KEY
-  - id: acme-ledger-prod
-    tenantId: acme
-    backendId: acme-ledger
-    baseUrl: https://ledger.internal.example
-    network:
-      allowedProtocols:
-        - https
-      allowPrivateNetwork: true
+  - id: globex-petstore-basic
+    tenantId: globex
+    backendId: petstore
+    baseUrl: https://example.com
     auth:
-      type: apiKey
-      in: header
-      name: X-Ledger-Key
-      valueRef: env:ACME_LEDGER_API_KEY
+      type: basic
+      usernameRef: env:GLOBEX_PETSTORE_USERNAME
+      passwordRef: env:GLOBEX_PETSTORE_PASSWORD

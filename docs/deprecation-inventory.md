@@ -70,3 +70,14 @@ The following strings must never reappear outside this file:
   Phase 5, and legacy deletion finishes in Phase 7.
 - The brand-reference and secret sweeps run in CI on every change, so legacy
   names and credentials cannot reappear.
+
+## Phase 7 verification
+
+Phase 7 completes the clean cutover. Every "Replace or remove" item above is
+confirmed absent from this repository: the sweep finds no legacy product
+names, team identifiers, or credentials, and the source tree contains no
+legacy CLI commands, first-class tools, CLI proxy, operation aliases, path
+rewrites, presets, portal login, fixed org/workspace/locale context,
+`/api/assets` handling, or NestJS-specific catalog generation. Only the MCP
+Portico public interfaces remain: the operator CLI, the fixed MCP toolset,
+the tenant registry, and the read-only inspector.
