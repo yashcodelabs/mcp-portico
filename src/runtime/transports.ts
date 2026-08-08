@@ -5,6 +5,7 @@ import {
   assertDestinationAllowed,
   assertDestinationDnsAllowed,
 } from '../security/network';
+import { redactUrlQuerySecrets } from '../security/headers';
 import { isRedirectStatus, resolveRedirectTarget } from '../security/redirects';
 import { PorticoError } from '../shared/errors';
 
@@ -28,6 +29,11 @@ export interface DispatchInit {
   method?: string;
   headers?: Record<string, string>;
   body?: Buffer | string | null;
+  /**
+   * Names of query parameters holding secret values (auth-injected API
+   * keys). Every rendered URL (`finalUrl`) must redact these values.
+   */
+  redactQueryParams?: Iterable<string>;
 }
 
 export interface DispatchOptions {
@@ -100,11 +106,28 @@ function escapeHeaderValue(value: string): string {
   return value.replace(/[\r\n]/g, '').replace(/"/g, '\\"');
 }
 
-function encodeMultipartBody(body: unknown): EncodedRequestBody {
+function assertBodyBudget(
+  additionalBytes: number,
+  budget: number | undefined,
+  currentBytes: number,
+): void {
+  if (budget !== undefined && currentBytes + additionalBytes > budget) {
+    throw new PorticoError('USAGE', `Request body exceeds the ${budget} byte limit.`);
+  }
+}
+
+function encodeMultipartBody(
+  body: unknown,
+  budget: number | undefined,
+): EncodedRequestBody {
   const boundary = `----portico-${randomBytes(8).toString('hex')}`;
   const chunks: Buffer[] = [];
+  let total = 0;
   const pushText = (text: string): void => {
-    chunks.push(Buffer.from(text, 'utf8'));
+    const chunk = Buffer.from(text, 'utf8');
+    assertBodyBudget(chunk.byteLength, budget, total);
+    chunks.push(chunk);
+    total += chunk.byteLength;
   };
   const fields =
     body !== null && typeof body === 'object' && !Array.isArray(body)
@@ -125,7 +148,13 @@ function encodeMultipartBody(body: unknown): EncodedRequestBody {
         pushText(`Content-Type: ${value.contentType}\r\n`);
       }
       pushText('\r\n');
-      chunks.push(Buffer.from(value.base64, 'base64'));
+      // Bound the decoded part before allocating it.
+      const estimated = Math.ceil(value.base64.length / 4) * 3;
+      assertBodyBudget(estimated, budget, total);
+      const decoded = Buffer.from(value.base64, 'base64');
+      assertBodyBudget(decoded.byteLength, budget, total);
+      chunks.push(decoded);
+      total += decoded.byteLength;
       pushText('\r\n');
     } else {
       pushText(`Content-Disposition: form-data; name="${escapeHeaderValue(name)}"\r\n`);
@@ -149,24 +178,41 @@ function encodeMultipartBody(body: unknown): EncodedRequestBody {
 export function encodeRequestBody(
   kind: RequestBodyKind,
   body: unknown,
+  options: { maxBytes?: number } = {},
 ): EncodedRequestBody {
+  const budget = options.maxBytes;
   switch (kind) {
-    case 'json':
-      return { body: JSON.stringify(body), contentType: 'application/json' };
-    case 'form':
+    case 'json': {
+      const text = JSON.stringify(body);
+      assertBodyBudget(Buffer.byteLength(text, 'utf8'), budget, 0);
+      return { body: text, contentType: 'application/json' };
+    }
+    case 'form': {
+      const text = encodeFormBody(body);
+      assertBodyBudget(Buffer.byteLength(text, 'utf8'), budget, 0);
       return {
-        body: encodeFormBody(body),
+        body: text,
         contentType: 'application/x-www-form-urlencoded',
       };
+    }
     case 'multipart':
-      return encodeMultipartBody(body);
-    case 'binary':
+      return encodeMultipartBody(body, budget);
+    case 'binary': {
+      const encoded = String(body);
+      const estimated = Math.ceil(encoded.length / 4) * 3;
+      assertBodyBudget(estimated, budget, 0);
+      const decoded = Buffer.from(encoded, 'base64');
+      assertBodyBudget(decoded.byteLength, budget, 0);
       return {
-        body: Buffer.from(String(body), 'base64'),
+        body: decoded,
         contentType: 'application/octet-stream',
       };
-    case 'text':
-      return { body: String(body), contentType: 'text/plain' };
+    }
+    case 'text': {
+      const text = String(body);
+      assertBodyBudget(Buffer.byteLength(text, 'utf8'), budget, 0);
+      return { body: text, contentType: 'text/plain' };
+    }
   }
 }
 
@@ -298,7 +344,7 @@ export async function dispatchUpstream(
       headers,
       body: buffer,
       truncated,
-      finalUrl: currentUrl.toString(),
+      finalUrl: redactUrlQuerySecrets(currentUrl, init.redactQueryParams ?? []),
     };
   }
 

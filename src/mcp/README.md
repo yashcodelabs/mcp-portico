@@ -22,6 +22,34 @@ HTTP transport on a single endpoint: `POST /mcp`.
 | `notifications/initialized` | POST /mcp | none   | Client-ready signal; acknowledged with 202.                                  |
 | `tools/list`                | POST /mcp | Bearer | Lists the fixed toolset.                                                     |
 | `tools/call`                | POST /mcp | Bearer | Invokes one of the fixed tools.                                              |
+| `resources/list`            | POST /mcp | Bearer | Lists the authenticated tenant's resources (usage + API Explorer metadata).  |
+| `resources/read`            | POST /mcp | Bearer | Reads one tenant-scoped resource by URI.                                     |
+
+## Resources (API Explorer / MCP Apps metadata)
+
+`resources/list` returns three kinds of URIs, all scoped to the
+authenticated principal:
+
+| URI                       | Contents                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `mcp-portico://usage`     | Tenant-scoped usage summary derived from in-memory audit events.              |
+| `mcp-portico://apis`      | API Explorer overview: every authorized connection with its catalog metadata. |
+| `mcp-portico://apis/<id>` | One authorized connection: connection metadata plus the full operation list.  |
+
+`resources/read` requires `{ uri }` and returns standard MCP resource
+contents (`contents[0].text` is a JSON string). Unknown, unauthorized, and
+cross-tenant URIs all return the same `-32602 Unknown resource` error.
+
+### Refresh contract
+
+The transport is request/response only (no SSE), so the server cannot push
+`notifications/resources/list_changed` or `notifications/resources/updated`.
+For that reason `initialize` advertises only `capabilities: { tools: {},
+resources: {} }` and never claims `subscribe` or `listChanged` support.
+Clients detect a registry reload by comparing `registryRevision` embedded in
+every resource payload (and `checksum` per catalog) and re-read the resource
+when it changes. All client notifications, including
+`notifications/initialized`, are acknowledged with `202` and an empty body.
 
 ## Authentication
 
@@ -70,6 +98,10 @@ enumerated across tenant boundaries.
   `describe_operation`, `call_operation`, `call_operations`) re-validate the
   stored session against the current registry snapshot on every call; stale,
   revoked, or cross-tenant sessions are rejected with generic errors.
+- The cached active session is re-validated after every successful
+  authentication and dropped as soon as it is stale (registry reload) or
+  revoked (principal/connection removed), so the next call returns
+  `No active session; select a connection first.`
 - Calling a session-scoped tool before `select_connection` fails with
   `No active session; select a connection first.`
 

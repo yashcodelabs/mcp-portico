@@ -2,18 +2,20 @@ import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-import { assertLoopbackBindingAllowed, type AuthMode } from '../auth/binding';
+import { assertServeAuthAllowed, type AuthMode } from '../auth/binding';
 import {
   assertSecretsResolvable,
   collectConnectionSecretRefs,
   defaultSecretResolver,
 } from '../auth/secrets';
 import type { IdentityProvider } from '../auth/types';
+import { defaultUpstreamAuthRegistry } from '../auth/upstream';
 import { MemoryAuditLog, type AuditLog } from '../audit/log';
 import { StaticBearerIdentityProvider } from '../identity/static-bearer';
 import { Inspector } from '../inspector/server';
 import { LimitsStore } from '../limits/store';
 import { McpServer } from '../mcp/server';
+import type { Connection } from '../registry/types';
 import {
   buildRegistrySnapshot,
   RuntimeRegistry,
@@ -50,6 +52,13 @@ export interface ServerContext {
 }
 
 const MAX_MCP_BODY_BYTES = 10 * 1024 * 1024;
+
+/** Validate a connection's upstream auth configuration at load/reload time. */
+async function assertUpstreamAuthValid(connection: Connection): Promise<void> {
+  const auth = defaultUpstreamAuthRegistry.toConnectionAuth(connection.auth);
+  const provider = defaultUpstreamAuthRegistry.get(connection.auth.type);
+  await provider.validate(auth);
+}
 
 export interface RunningServer {
   host: string;
@@ -96,7 +105,11 @@ function readBody(req: http.IncomingMessage, limit: number): Promise<string> {
 }
 
 export async function startServer(options: ServeOptions): Promise<RunningServer> {
-  assertLoopbackBindingAllowed({ host: options.host, authMode: options.authMode });
+  assertServeAuthAllowed({
+    host: options.host,
+    authMode: options.authMode,
+    registryConfigured: options.registryPath !== undefined,
+  });
 
   const sessions = new SessionStore();
   const limits = new LimitsStore();
@@ -114,6 +127,7 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
         collectConnectionSecretRefs(connection),
         defaultSecretResolver,
       );
+      await assertUpstreamAuthValid(connection);
       await assertDestinationDnsAllowed(
         new URL(connection.baseUrl),
         connection.network ?? {},
@@ -238,13 +252,22 @@ export async function startServer(options: ServeOptions): Promise<RunningServer>
                 collectConnectionSecretRefs(connection),
                 defaultSecretResolver,
               );
+              await assertUpstreamAuthValid(connection);
               await assertDestinationDnsAllowed(
                 new URL(connection.baseUrl),
                 connection.network ?? {},
                 { context: 'load' },
               );
             }
-            registry.publish();
+            if (options.authMode === 'bearer') {
+              const pepper = process.env[envName('KEY_PEPPER')] ?? '';
+              const candidateProvider = new StaticBearerIdentityProvider(
+                candidate,
+                pepper,
+              );
+              await candidateProvider.validate();
+            }
+            snapshot = registry.publish();
           } catch {
             // Invalid candidate: the previous complete snapshot stays active.
           }

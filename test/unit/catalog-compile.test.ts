@@ -195,6 +195,164 @@ describe('catalog compilation', () => {
     ).toBe(true);
   });
 
+  it('keeps operations available when at least one OR security alternative is supported', () => {
+    const { catalog, warnings } = compileCatalog(
+      modelWith({
+        securitySchemes: {
+          apiKey: { type: 'apiKey', in: 'header', name: 'X-API-Key' },
+          oauth2: { type: 'oauth2' },
+        },
+        operations: [
+          {
+            method: 'GET',
+            path: '/a',
+            responses: {},
+            security: [['apiKey'], ['oauth2']],
+          },
+          {
+            method: 'GET',
+            path: '/b',
+            responses: {},
+            security: [['oauth2'], []],
+          },
+          {
+            method: 'GET',
+            path: '/c',
+            responses: {},
+            security: [['oauth2', 'apiKey']],
+          },
+        ],
+      }),
+      undefined,
+      { now: FIXED_NOW },
+    );
+    // OR semantics: the apiKey alternative keeps /a executable; the empty
+    // alternative keeps /b executable; /c requires both schemes AND-ed, so
+    // the unsupported oauth2 still disables it.
+    expect(catalog.operations['a.get']?.available).toBe(true);
+    expect(catalog.operations['b.get']?.available).toBe(true);
+    expect(catalog.operations['c.get']?.available).toBe(false);
+    const unsupported = warnings.filter(
+      (warning) => warning.code === 'UNSUPPORTED_SECURITY_SCHEME',
+    );
+    expect(unsupported).toHaveLength(3);
+    expect(
+      unsupported.filter((warning) =>
+        warning.message.includes(
+          'operation stays available through a supported alternative',
+        ),
+      ),
+    ).toHaveLength(2);
+    expect(
+      unsupported.some((warning) =>
+        warning.message.includes('operation is unavailable'),
+      ),
+    ).toBe(true);
+  });
+
+  it('fails closed on out-of-range AI confidence even for manual models', () => {
+    const issues = compileIssues(() =>
+      compileCatalog(
+        modelWith({
+          operations: [
+            {
+              method: 'GET',
+              path: '/a',
+              responses: {},
+              aiConfidence: 2,
+            },
+          ],
+        }),
+      ),
+    );
+    expect(issues).toContain('INVALID_AI_CONFIDENCE');
+  });
+
+  it('gates operations whose required request body is unsupported', () => {
+    const { catalog, warnings } = compileCatalog(
+      modelWith({
+        operations: [
+          {
+            method: 'POST',
+            path: '/a',
+            responses: {},
+            requiredBodyUnsupported: true,
+          },
+        ],
+      }),
+      undefined,
+      { now: FIXED_NOW },
+    );
+    expect(catalog.operations['a.post']?.available).toBe(false);
+    expect(
+      warnings.some((warning) => warning.code === 'UNSUPPORTED_REQUIRED_BODY'),
+    ).toBe(true);
+  });
+
+  it('sanitizes protected overlay headers out of the catalog', () => {
+    const overlay: PolicyOverlay = {
+      overlayVersion: '1.0',
+      operations: {
+        'a.get': {
+          headers: {
+            Authorization: 'Bearer secret-token',
+            'X-API-Key': 'api-key-value',
+            'X-Trace-Id': 'trace-123',
+          },
+        },
+      },
+    };
+    const { catalog, warnings } = compileCatalog(
+      modelWith({
+        operations: [{ method: 'GET', path: '/a', responses: {} }],
+      }),
+      overlay,
+      { now: FIXED_NOW },
+    );
+    expect(catalog.operations['a.get']?.headers).toEqual({ 'X-Trace-Id': 'trace-123' });
+    const sanitized = warnings.filter(
+      (warning) => warning.code === 'SANITIZED_PROTECTED_HEADER',
+    );
+    expect(sanitized.map((warning) => warning.message)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Authorization'),
+        expect.stringContaining('X-API-Key'),
+      ]),
+    );
+  });
+
+  it('redacts credential-shaped example values before compilation', () => {
+    const { catalog, warnings } = compileCatalog(
+      modelWith({
+        operations: [
+          {
+            method: 'POST',
+            path: '/a',
+            responses: {},
+            examples: [
+              {
+                location: 'request',
+                contentType: 'application/json',
+                example: { token: 'sk-secret-token', name: 'Rex' },
+              },
+            ],
+          },
+        ],
+      }),
+      undefined,
+      { now: FIXED_NOW },
+    );
+    const examples = catalog.operations['a.post']?.examples as Array<{
+      example: Record<string, unknown>;
+    }>;
+    expect(examples[0]?.example).toEqual({
+      token: '<redacted>',
+      name: 'Rex',
+    });
+    expect(JSON.stringify(catalog)).not.toContain('sk-secret-token');
+    expect(warnings.some((warning) => warning.code === 'SANITIZED_EXAMPLE')).toBe(true);
+  });
+
   it('fails closed on unresolved security schemes', () => {
     const unresolved = modelWith({
       operations: [

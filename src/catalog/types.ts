@@ -177,6 +177,12 @@ export interface NormalizedOperation {
   requestBody?: NormalizedRequestBody;
   responses: Record<string, NormalizedResponse>;
   security?: string[][];
+  /**
+   * Set by importers when a required request body could not be represented
+   * (no supported content types). The compiler compiles the operation as
+   * unavailable so it can never be executed without its required body.
+   */
+  requiredBodyUnsupported?: boolean;
   /** Optional policy hints honored before the overlay (manual models). */
   risk?: RiskLevel;
   confirmation?: ConfirmationPolicy;

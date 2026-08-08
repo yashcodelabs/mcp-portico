@@ -41,6 +41,18 @@ export interface BindingPolicy {
 }
 
 /**
+ * Serve-time auth policy: the loopback binding rules plus whether a
+ * tenant-aware registry runtime is configured.
+ */
+export interface ServeAuthPolicy extends BindingPolicy {
+  /**
+   * True when a registry is loaded, which enables tenant-aware MCP tools,
+   * resources, and the inspector.
+   */
+  registryConfigured: boolean;
+}
+
+/**
  * Unauthenticated mode may only bind to a loopback interface. Remote binding
  * requires a real identity provider (Phase 3).
  */
@@ -49,6 +61,29 @@ export function assertLoopbackBindingAllowed(policy: BindingPolicy): void {
     throw new PorticoError(
       'CONFIG_ERROR',
       `Unauthenticated mode (MCP_PORTICO_AUTH_MODE=none) may only bind to a loopback interface; refusing to bind to "${policy.host}".`,
+      { details: { host: policy.host } },
+    );
+  }
+}
+
+/**
+ * Startup validation for a serve process.
+ *
+ * Unauthenticated mode is preserved only for health-only loopback serving
+ * without a registry. Tenant-aware MCP tools require an authenticated
+ * principal, and `none` has no identity provider, so combining it with a
+ * registry would produce a runtime that no MCP client or inspector can
+ * authenticate against. The safe local-development contract for tenant-aware
+ * serving is an explicitly configured synthetic local-development principal
+ * (not yet supported); until one exists, startup fails instead of silently
+ * serving an unauthenticatable registry.
+ */
+export function assertServeAuthAllowed(policy: ServeAuthPolicy): void {
+  assertLoopbackBindingAllowed(policy);
+  if (policy.authMode === 'none' && policy.registryConfigured) {
+    throw new PorticoError(
+      'CONFIG_ERROR',
+      'Unauthenticated mode (MCP_PORTICO_AUTH_MODE=none) cannot serve a tenant-aware registry: no synthetic local-development principal is configured. Start with --auth-mode bearer and a keyed principal, or omit --registry for health-only loopback serving.',
       { details: { host: policy.host } },
     );
   }

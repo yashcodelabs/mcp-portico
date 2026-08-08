@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assertLoopbackBindingAllowed,
+  assertServeAuthAllowed,
   DEFAULT_AUTH_MODE,
   isLoopbackHost,
   parseAuthMode,
@@ -53,6 +54,52 @@ describe('loopback-only binding validation', () => {
   it('allows remote binding when an identity mode is configured', () => {
     expect(() =>
       assertLoopbackBindingAllowed({ host: '0.0.0.0', authMode: 'bearer' }),
+    ).not.toThrow();
+  });
+
+  it('rejects unauthenticated mode for a tenant-aware registry at startup', () => {
+    let thrown: unknown;
+    try {
+      assertServeAuthAllowed({
+        host: '127.0.0.1',
+        authMode: 'none',
+        registryConfigured: true,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(PorticoError);
+    expect((thrown as PorticoError).code).toBe('CONFIG_ERROR');
+    expect((thrown as PorticoError).message).toContain('synthetic');
+  });
+
+  it('allows unauthenticated health-only loopback serving without a registry', () => {
+    expect(() =>
+      assertServeAuthAllowed({
+        host: '127.0.0.1',
+        authMode: 'none',
+        registryConfigured: false,
+      }),
+    ).not.toThrow();
+  });
+
+  it('still rejects remote binding in unauthenticated mode for a tenant-aware registry', () => {
+    expect(() =>
+      assertServeAuthAllowed({
+        host: '0.0.0.0',
+        authMode: 'none',
+        registryConfigured: true,
+      }),
+    ).toThrow(PorticoError);
+  });
+
+  it('allows a tenant-aware registry with an identity mode', () => {
+    expect(() =>
+      assertServeAuthAllowed({
+        host: '0.0.0.0',
+        authMode: 'bearer',
+        registryConfigured: true,
+      }),
     ).not.toThrow();
   });
 

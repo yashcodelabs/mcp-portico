@@ -1,8 +1,9 @@
 import { defaultUpstreamAuthRegistry } from '../auth/upstream';
 import { defaultSecretResolver, resolveSecretOrLiteral } from '../auth/secrets';
-import type { SecretResolver } from '../auth/types';
+import type { SecretResolver, UpstreamRequest } from '../auth/types';
 import type { Connection, NetworkPolicy } from '../registry/types';
 import { defaultRedactor } from '../shared/redact';
+import { redactUrlQuerySecrets } from './headers';
 import { assertDestinationAllowed, assertDestinationDnsAllowed } from './network';
 import { sanitizeUpstreamHeaders } from './headers';
 import { isRedirectStatus, resolveRedirectTarget } from './redirects';
@@ -58,6 +59,7 @@ export async function executeProbe(options: ProbeOptions): Promise<ProbeResult> 
   let redirected = false;
   let method = options.method ?? 'GET';
   let body = options.body;
+  let secretQueryParams = new Set<string>();
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     assertDestinationAllowed(url, options.network, {
@@ -74,14 +76,21 @@ export async function executeProbe(options: ProbeOptions): Promise<ProbeResult> 
     }
     sanitizeUpstreamHeaders(headers);
 
-    const request = { url, headers, query: new Map<string, string>() };
+    const request: UpstreamRequest = { url, headers, query: new Map() };
     const auth = authRegistry.toConnectionAuth(options.auth);
     const provider = authRegistry.get(options.auth.type);
     await provider.validate(auth);
     await provider.apply(request, auth, secrets);
+    sanitizeUpstreamHeaders(request.headers, {
+      allow:
+        options.auth.type === 'bearer' || options.auth.type === 'basic'
+          ? ['authorization']
+          : [],
+    });
     for (const [name, value] of request.query) {
       request.url.searchParams.set(name, value);
     }
+    secretQueryParams = request.secretQueryParams ?? new Set<string>();
 
     let response: Response;
     try {
@@ -100,7 +109,7 @@ export async function executeProbe(options: ProbeOptions): Promise<ProbeResult> 
         bytes: 0,
         truncated: false,
         redirected,
-        finalUrl: url.toString(),
+        finalUrl: redactUrlQuerySecrets(url, secretQueryParams),
         headers: {},
         errorCode: 'REQUEST_FAILED',
         message: error instanceof Error ? error.message : String(error),
@@ -132,7 +141,7 @@ export async function executeProbe(options: ProbeOptions): Promise<ProbeResult> 
       bytes,
       truncated,
       redirected,
-      finalUrl: url.toString(),
+      finalUrl: redactUrlQuerySecrets(url, secretQueryParams),
       headers: redactResponseHeaders(response),
     };
   }
@@ -144,7 +153,7 @@ export async function executeProbe(options: ProbeOptions): Promise<ProbeResult> 
     bytes: 0,
     truncated: false,
     redirected,
-    finalUrl: url.toString(),
+    finalUrl: redactUrlQuerySecrets(url, secretQueryParams),
     headers: {},
     errorCode: 'TOO_MANY_REDIRECTS',
     message: `Exceeded ${MAX_REDIRECTS} redirect hops.`,

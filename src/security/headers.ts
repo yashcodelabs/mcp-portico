@@ -29,15 +29,39 @@ const PROTECTED_HEADERS = new Set([
   'expect',
 ]);
 
-/** Remove headers that must never travel upstream from an outbound request. */
-export function sanitizeUpstreamHeaders(headers: Map<string, string>): void {
+/** True when a header name is reserved and must never be client- or config-controlled. */
+export function isProtectedUpstreamHeaderName(name: string): boolean {
+  const normalized = name.toLowerCase();
+  return (
+    PROTECTED_HEADERS.has(normalized) ||
+    normalized.startsWith(HEADER_PREFIX) ||
+    normalized === 'x-mcp-portico'
+  );
+}
+
+export interface SanitizeUpstreamHeadersOptions {
+  /**
+   * Header names that are allowed to survive sanitization. The auth
+   * providers use this to keep their own `authorization` credential header
+   * while still stripping every other protected header.
+   */
+  allow?: Iterable<string>;
+}
+
+/**
+ * Remove headers that must never travel upstream from an outbound request.
+ * Protected headers are stripped unless explicitly listed in `allow`
+ * (credential injection by an auth provider).
+ */
+export function sanitizeUpstreamHeaders(
+  headers: Map<string, string>,
+  options: SanitizeUpstreamHeadersOptions = {},
+): void {
+  const allow = new Set([...(options.allow ?? [])].map((name) => name.toLowerCase()));
   for (const name of [...headers.keys()]) {
     const normalized = name.toLowerCase();
-    if (
-      PROTECTED_HEADERS.has(normalized) ||
-      normalized.startsWith(HEADER_PREFIX) ||
-      normalized === 'x-mcp-portico'
-    ) {
+    if (allow.has(normalized)) continue;
+    if (isProtectedUpstreamHeaderName(normalized)) {
       headers.delete(name);
     }
   }
@@ -76,4 +100,22 @@ export function assertStaticHeadersSafeOrThrow(
       details: { problems },
     });
   }
+}
+
+/**
+ * Render a URL with the values of the named query parameters replaced by a
+ * redaction placeholder. Used wherever a request URL (including `finalUrl`)
+ * can be observed: MCP results, inspector payloads, CLI output, and logs.
+ */
+export function redactUrlQuerySecrets(
+  url: URL,
+  secretParamNames: Iterable<string>,
+): string {
+  const redacted = new URL(url.toString());
+  for (const name of secretParamNames) {
+    if (redacted.searchParams.has(name)) {
+      redacted.searchParams.set(name, '<redacted>');
+    }
+  }
+  return redacted.toString();
 }

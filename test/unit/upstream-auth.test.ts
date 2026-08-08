@@ -23,17 +23,26 @@ const resolver: SecretResolver = {
 async function apply(
   config: ConnectionAuthConfig,
   secretResolver: SecretResolver = resolver,
-): Promise<{ headers: Map<string, string>; query: Map<string, string> }> {
+): Promise<{
+  headers: Map<string, string>;
+  query: Map<string, string>;
+  secretQueryParams: Set<string>;
+}> {
   const request: UpstreamRequest = {
     url: new URL('https://example.com/resource'),
     headers: new Map(),
     query: new Map(),
+    secretQueryParams: new Set(),
   };
   const auth = defaultUpstreamAuthRegistry.toConnectionAuth(config);
   const provider = defaultUpstreamAuthRegistry.get(config.type);
   await provider.validate(auth);
   await provider.apply(request, auth, secretResolver);
-  return { headers: request.headers, query: request.query };
+  return {
+    headers: request.headers,
+    query: request.query,
+    secretQueryParams: request.secretQueryParams ?? new Set(),
+  };
 }
 
 describe('upstream auth providers', () => {
@@ -151,5 +160,39 @@ describe('upstream auth providers', () => {
     }
     expect(logSpy).not.toHaveBeenCalled();
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('tracks query-injected API key names as secret query parameters', async () => {
+    const { secretQueryParams } = await apply({
+      type: 'apiKey',
+      in: 'query',
+      name: 'api_key',
+      valueRef: 'env:KEY',
+    });
+    expect(secretQueryParams.has('api_key')).toBe(true);
+  });
+
+  it('refuses to inject protected headers through apiKey auth', async () => {
+    for (const name of ['host', 'transfer-encoding', 'x-mcp-portico-tenant']) {
+      await expect(
+        apply({
+          type: 'apiKey',
+          in: 'header',
+          name,
+          valueRef: 'env:KEY',
+        }),
+      ).rejects.toThrow(PorticoError);
+    }
+  });
+
+  it('refuses to inject protected headers through staticHeaders auth', async () => {
+    for (const name of ['host', 'authorization', 'connection', 'x-mcp-portico']) {
+      await expect(
+        apply({
+          type: 'staticHeaders',
+          headers: { [name]: 'value' },
+        }),
+      ).rejects.toThrow(PorticoError);
+    }
   });
 });

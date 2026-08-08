@@ -56,6 +56,7 @@ export async function importOpenApi(
     spec,
     store,
     options.apiId,
+    { requireAiOperationMetadata: sourceType === 'ai' },
   );
 
   if (

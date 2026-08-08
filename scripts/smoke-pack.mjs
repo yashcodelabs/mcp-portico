@@ -2,9 +2,13 @@
 /**
  * Package smoke test and content audit (Phase 7 release prep).
  *
- * Packs the npm artifact, audits its contents against the published
- * surface, and runs the CLI from the extracted tarball. Fails on any
- * missing expected file, leaked development file, or CLI regression.
+ * Packs the npm artifact (packing runs `prepack`, which builds a fresh
+ * `dist/`), audits its contents against the published surface, verifies that
+ * every relative link in the packaged documentation resolves inside the
+ * tarball, audits the licenses of every installed production dependency, and
+ * runs the CLI from the extracted tarball. Fails on any missing expected
+ * file, leaked development file, broken doc link, unexpected dependency
+ * license, or CLI regression.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -38,6 +42,19 @@ const EXPECTED_PACKAGE_FILES = [
   'schemas/README.md',
   'LICENSE',
   'README.md',
+  'CHANGELOG.md',
+  'CONTRIBUTING.md',
+  'SECURITY.md',
+  'examples/README.md',
+  'examples/apis/petstore.openapi.yaml',
+  'examples/apis/petstore.catalog.json',
+  'examples/sample-catalog.json',
+  'examples/sample-overlay.json',
+  'examples/sample-registry.json',
+  'examples/sample-registry.yaml',
+  'docs/registry.md',
+  'docs/migration.md',
+  'docs/deprecation-inventory.md',
 ];
 
 const FORBIDDEN_PACKAGE_PREFIXES = [
@@ -47,7 +64,29 @@ const FORBIDDEN_PACKAGE_PREFIXES = [
   'node_modules/',
   'dist/../',
   '.env',
+  '.github/',
+  '.opencode/',
+  '.cursor/',
+  'docs/assets/',
+  'docs/ai-analysis.md',
+  'docs/mcp-portico-implementation-plan.md',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'tsconfig.json',
+  'vitest.config.ts',
 ];
+
+const ALLOWED_LICENSES = new Set([
+  '0BSD',
+  'APACHE-2.0',
+  'BSD-2-CLAUSE',
+  'BSD-3-CLAUSE',
+  'CC0-1.0',
+  'ISC',
+  'MIT',
+  'MIT-0',
+  'UNLICENSE',
+]);
 
 const problems = [];
 
@@ -68,6 +107,88 @@ function run(cmd, args, cwd, options = {}) {
     stdio: 'pipe',
     ...options,
   });
+}
+
+function licenseExpression(license) {
+  if (license === undefined || license === null) return null;
+  if (typeof license === 'string') return license;
+  if (typeof license === 'object' && typeof license.type === 'string') {
+    return license.type;
+  }
+  if (Array.isArray(license)) {
+    const types = license
+      .map((entry) => (typeof entry === 'string' ? entry : entry?.type))
+      .filter((entry) => typeof entry === 'string');
+    return types.length > 0 ? types.join(' OR ') : null;
+  }
+  return null;
+}
+
+function isAllowedLicense(expression) {
+  if (expression === null) return false;
+  const tokens = expression
+    .toUpperCase()
+    .replace(/[()]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  return tokens.every((token) => {
+    if (token === 'AND' || token === 'OR' || token === 'WITH') return true;
+    if (/^\d+(?:\.\d+)*$/.test(token)) return true; // SPDX version suffix, e.g. 2.0
+    return ALLOWED_LICENSES.has(token);
+  });
+}
+
+function collectInstalledPackages(nodeModulesDir) {
+  const packages = [];
+  const pending = [nodeModulesDir];
+  while (pending.length > 0) {
+    const dir = pending.pop();
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+      pending.push(join(dir, entry.name));
+    }
+    const manifestFile = join(dir, 'package.json');
+    if (!existsSync(manifestFile)) continue;
+    try {
+      const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));
+      if (typeof manifest.name === 'string' && typeof manifest.version === 'string') {
+        packages.push({
+          name: manifest.name,
+          version: manifest.version,
+          license: manifest.license,
+        });
+      }
+    } catch {
+      // Ignore malformed manifests; a broken install fails earlier.
+    }
+  }
+  return packages;
+}
+
+function auditMarkdownLinks(extractDir, files) {
+  const linkPattern = /\[[^\]]*\]\(([^)]+)\)/g;
+  for (const file of files) {
+    if (!file.endsWith('.md')) continue;
+    const text = readFileSync(join(extractDir, file), 'utf8');
+    linkPattern.lastIndex = 0;
+    let match;
+    while ((match = linkPattern.exec(text)) !== null) {
+      const raw = match[1].trim();
+      if (raw === '' || raw.startsWith('#')) continue;
+      if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) continue; // absolute URL or scheme
+      const target = raw.split('#')[0];
+      if (target === '') continue;
+      if (!existsSync(resolve(extractDir, dirname(file), target))) {
+        problems.push(`broken link in packaged ${file}: ${raw}`);
+      }
+    }
+  }
 }
 
 try {
@@ -117,6 +238,7 @@ try {
           }
         }
       }
+      auditMarkdownLinks(extractDir, files);
 
       // Install the tarball into a fresh consumer project so dependency
       // resolution is tested exactly like a real installation.
@@ -188,6 +310,18 @@ try {
       );
       if (!imported.includes('Imported')) {
         problems.push('packed CLI catalog import failed');
+      }
+
+      const installed = collectInstalledPackages(join(consumer, 'node_modules'));
+      const licenseProblems = installed.filter(
+        (pkg) => !isAllowedLicense(licenseExpression(pkg.license)),
+      );
+      if (licenseProblems.length > 0) {
+        problems.push(
+          `license audit failed: ${licenseProblems
+            .map((pkg) => `${pkg.name}@${pkg.version} (${JSON.stringify(pkg.license)})`)
+            .join(', ')}`,
+        );
       }
     }
   }

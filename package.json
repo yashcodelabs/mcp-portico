@@ -24,6 +24,13 @@
   "files": [
     "dist",
     "schemas",
+    "examples",
+    "docs/registry.md",
+    "docs/migration.md",
+    "docs/deprecation-inventory.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
     "LICENSE",
     "README.md"
   ],
@@ -37,6 +44,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepack": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
@@ -49,11 +57,11 @@
     "sweep:secrets": "node scripts/sweep.mjs --secrets",
     "smoke": "node scripts/smoke-cli.mjs",
     "test:pack": "node scripts/smoke-pack.mjs",
-    "audit:deps": "npm audit --omit=dev",
+    "audit:deps": "pnpm audit --prod",
     "cli": "tsx src/cli/index.ts",
     "mcp-portico": "tsx src/cli/index.ts",
     "serve": "tsx src/cli/index.ts serve",
-    "ci:check": "pnpm typecheck && pnpm format:check && pnpm test && pnpm test:fixtures && pnpm sweep && pnpm build && pnpm smoke && pnpm test:pack"
+    "ci:check": "pnpm audit:deps && pnpm typecheck && pnpm format:check && pnpm test && pnpm test:fixtures && pnpm sweep && pnpm build && pnpm smoke && pnpm test:pack"
   },
   "dependencies": {
     "ajv": "^8.20.0",

@@ -137,6 +137,13 @@ secret, and checks destinations before listening. It watches the registry file
 and publishes changes atomically: an invalid candidate leaves the previous
 snapshot active, and valid changes invalidate affected sessions and caches.
 
+Unauthenticated mode (`--auth-mode none`) is preserved only for health-only
+loopback serving without a registry. Combining `none` with `--registry` fails
+startup: tenant-aware MCP tools, resources, and the inspector require an
+authenticated principal, and no synthetic local-development principal is
+configured yet. Serve a registry with `--auth-mode bearer` and at least one
+keyed principal.
+
 ## Runtime isolation
 
 The tenant-aware runtime derives tenant and principal exclusively from the

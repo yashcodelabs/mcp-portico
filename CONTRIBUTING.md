@@ -23,16 +23,48 @@ pnpm ci:check
 
 This runs, in order:
 
-1. Typecheck (`tsc --noEmit`)
-2. Format check (Prettier)
-3. Unit and integration tests (Vitest)
-4. Fixture validation (JSON/YAML fixtures under `examples/` and `test/fixtures/`)
-5. Brand-reference and secret sweep
-6. Production build
-7. CLI smoke test (built `mcp-portico` binary: `--help` and `serve`)
+1. Dependency audit (`pnpm audit --prod`)
+2. Typecheck (`tsc --noEmit`)
+3. Format check (Prettier)
+4. Unit and integration tests (Vitest)
+5. Fixture validation (JSON/YAML fixtures under `examples/` and `test/fixtures/`)
+6. Brand-reference and secret sweep
+7. Production build
+8. CLI smoke test (built `mcp-portico` binary: `--help` and `serve`)
+9. Package smoke test (tarball contents, dependency licenses, doc links, and
+   installed CLI behavior)
 
 CI runs the same gate on Linux (Node 22 and 24), macOS (Node 22 and 24), and
 Windows (Node 22).
+
+## Release checklist
+
+Linux and macOS CI are the release gates; Windows CI is a non-blocking
+compatibility signal. Before publishing a release:
+
+1. Run the full local gate: `pnpm ci:check`.
+2. Run the dependency and license audits explicitly:
+   `pnpm audit:deps` (production vulnerabilities) and `pnpm test:pack`
+   (package contents, license audit of every installed production
+   dependency, and packaged documentation link check).
+3. Run the brand and secret sweeps: `pnpm sweep:brand` and
+   `pnpm sweep:secrets`.
+4. Pack with `pnpm pack`. The `prepack` script rebuilds `dist/` first, so the
+   tarball always contains fresh build output; never pack an existing `dist/`.
+5. Verify the walkthrough commands in
+   [examples/README.md](examples/README.md) from a clean checkout
+   (`pnpm install && pnpm build`, then import, validate, key create, serve,
+   and an MCP session). CI runs the import/validate/key-create part of the
+   walkthrough on every Linux/macOS run.
+6. Confirm the published package contains only the intended files: the
+   `files` allowlist in `package.json` plus `dist/`, `schemas/`, `examples/`,
+   the user-facing `docs/` files (`registry.md`, `migration.md`,
+   `deprecation-inventory.md`), `CHANGELOG.md`, `CONTRIBUTING.md`,
+   `SECURITY.md`, `LICENSE`, and `README.md`. Dev-only documents
+   (`docs/mcp-portico-implementation-plan.md`, `docs/ai-analysis.md`,
+   `docs/assets/`) are referenced from the README via GitHub URLs and are not
+   shipped.
+7. Update `CHANGELOG.md` with the release notes before tagging.
 
 ## Security rules
 

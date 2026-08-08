@@ -23,6 +23,11 @@ let lastPostRaw = '';
 let server: RunningServer;
 let acmeToken = '';
 let globexToken = '';
+let registryFile = '';
+let acmeCatalogChecksum = '';
+let globexCatalogChecksum = '';
+let acmeKey!: { keyId: string; digest: string };
+let globexKey!: { keyId: string; digest: string };
 
 function acmeModel(): NormalizedApiModel {
   return {
@@ -277,10 +282,12 @@ function port(): number {
 beforeAll(async () => {
   process.env[envName('KEY_PEPPER')] = PEPPER;
 
-  const acmeKey = generatePorticoKey(PEPPER);
-  const globexKey = generatePorticoKey(PEPPER);
-  acmeToken = acmeKey.token;
-  globexToken = globexKey.token;
+  const acmeKeyRecord = generatePorticoKey(PEPPER);
+  const globexKeyRecord = generatePorticoKey(PEPPER);
+  acmeKey = acmeKeyRecord;
+  globexKey = globexKeyRecord;
+  acmeToken = acmeKeyRecord.token;
+  globexToken = globexKeyRecord.token;
 
   const acmeCatalog = compileCatalog(acmeModel(), undefined, {
     now: new Date('2026-08-07T00:00:00.000Z'),
@@ -298,6 +305,8 @@ beforeAll(async () => {
     `${JSON.stringify(globexCatalog, null, 2)}\n`,
     'utf8',
   );
+  acmeCatalogChecksum = acmeCatalog.checksum;
+  globexCatalogChecksum = globexCatalog.checksum;
 
   upstream = http.createServer((req, res) => {
     const url = req.url ?? '/';
@@ -331,7 +340,7 @@ beforeAll(async () => {
   const address = upstream.address();
   upstreamPort = typeof address === 'object' && address !== null ? address.port : 0;
 
-  const registryFile = path.join(temporary, 'registry.json');
+  registryFile = path.join(temporary, 'registry.json');
   writeRegistryFile(
     registryFile,
     registryDocument(
@@ -661,5 +670,219 @@ describe('MCP server transport', () => {
     });
     expect(globexDenied.isError).toBe(true);
     expect(firstText(globexDenied)).toBe(firstText(acmeUnknown));
+  });
+
+  it('advertises only the capabilities it can deliver over JSON-RPC', async () => {
+    const init = await mcpCall({
+      jsonrpc: '2.0',
+      id: 400,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-06-18',
+        capabilities: {},
+        clientInfo: { name: 'test-client', version: '0.0.0' },
+      },
+    });
+    expect(init.status).toBe(200);
+    const capabilities = (
+      init.body as { result: { capabilities: Record<string, unknown> } }
+    ).result.capabilities;
+    // No subscribe/listChanged: this transport cannot push server-to-client
+    // notifications, so only list/read resources are advertised.
+    expect(capabilities).toEqual({ tools: {}, resources: {} });
+  });
+
+  it('lists and reads tenant-scoped resources', async () => {
+    const unauthorized = await mcpCall({
+      jsonrpc: '2.0',
+      id: 401,
+      method: 'resources/list',
+    });
+    expect(unauthorized.status).toBe(401);
+
+    const listed = await mcpCall(
+      { jsonrpc: '2.0', id: 402, method: 'resources/list' },
+      acmeToken,
+    );
+    expect(listed.status).toBe(200);
+    const resources = (listed.body as { result: { resources: Array<{ uri: string }> } })
+      .result.resources;
+    expect(resources.map((resource) => resource.uri)).toEqual([
+      'mcp-portico://usage',
+      'mcp-portico://apis',
+      `mcp-portico://apis/${encodeURIComponent('acme-billing')}`,
+    ]);
+
+    const usage = await mcpCall(
+      {
+        jsonrpc: '2.0',
+        id: 403,
+        method: 'resources/read',
+        params: { uri: 'mcp-portico://usage' },
+      },
+      acmeToken,
+    );
+    expect(usage.status).toBe(200);
+    const usageText = (
+      usage.body as {
+        result: { contents: Array<{ uri: string; mimeType: string; text: string }> };
+      }
+    ).result.contents[0]?.text;
+    expect(usageText).toBeDefined();
+    const usagePayload = JSON.parse(usageText ?? '{}') as Record<string, unknown>;
+    expect(usagePayload).toMatchObject({
+      resource: 'usage',
+      tenantId: 'acme',
+      persistence: { persisted: false, backend: 'in-memory' },
+      scope: { tenantId: 'acme' },
+    });
+    expect(usagePayload.registryRevision).toEqual(expect.any(Number));
+
+    const globexUsage = await mcpCall(
+      {
+        jsonrpc: '2.0',
+        id: 404,
+        method: 'resources/read',
+        params: { uri: 'mcp-portico://usage' },
+      },
+      globexToken,
+    );
+    const globexText = (
+      globexUsage.body as {
+        result: { contents: Array<{ text: string }> };
+      }
+    ).result.contents[0]?.text;
+    const globexPayload = JSON.parse(globexText ?? '{}') as {
+      byConnection: Array<{ tenantId: string }>;
+    };
+    expect(globexPayload.byConnection.every((row) => row.tenantId === 'globex')).toBe(
+      true,
+    );
+
+    const apis = await mcpCall(
+      {
+        jsonrpc: '2.0',
+        id: 405,
+        method: 'resources/read',
+        params: { uri: 'mcp-portico://apis' },
+      },
+      acmeToken,
+    );
+    const apisText = (apis.body as { result: { contents: Array<{ text: string }> } })
+      .result.contents[0]?.text;
+    const apisPayload = JSON.parse(apisText ?? '{}') as {
+      tenantId: string;
+      connections: Array<Record<string, unknown>>;
+    };
+    expect(apisPayload.tenantId).toBe('acme');
+    expect(apisPayload.connections).toHaveLength(1);
+    expect(apisPayload.connections[0]).toMatchObject({
+      id: 'acme-billing',
+      backendId: 'billing',
+      catalog: {
+        apiId: 'invoicing',
+        title: 'Invoicing API',
+        checksum: expect.any(String),
+        totals: { operations: 3, available: 3, enabled: 3 },
+      },
+    });
+
+    const single = await mcpCall(
+      {
+        jsonrpc: '2.0',
+        id: 406,
+        method: 'resources/read',
+        params: { uri: `mcp-portico://apis/${encodeURIComponent('acme-billing')}` },
+      },
+      acmeToken,
+    );
+    const singleText = (
+      single.body as { result: { contents: Array<{ text: string }> } }
+    ).result.contents[0]?.text;
+    const singlePayload = JSON.parse(singleText ?? '{}') as {
+      connection: {
+        catalog: { operations: Array<{ operationId: string; method: string }> };
+      };
+    };
+    expect(singlePayload.connection.catalog.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ operationId: 'invoice.get', method: 'GET' }),
+        expect.objectContaining({ operationId: 'invoice.create', method: 'POST' }),
+        expect.objectContaining({ operationId: 'invoice.delete', method: 'DELETE' }),
+      ]),
+    );
+
+    const unknown = await mcpCall(
+      {
+        jsonrpc: '2.0',
+        id: 407,
+        method: 'resources/read',
+        params: { uri: 'mcp-portico://no.such.resource' },
+      },
+      acmeToken,
+    );
+    expect(unknown.body).toMatchObject({
+      jsonrpc: '2.0',
+      id: 407,
+      error: { code: -32602, message: 'Unknown resource' },
+    });
+  });
+
+  it('clears stale active sessions after a registry reload', async () => {
+    await callTool(acmeToken, 'select_connection', {
+      connectionId: 'acme-billing',
+    });
+    const before = await callTool(acmeToken, 'get_session');
+    expect(before.isError).toBeFalsy();
+
+    // Republish the current registry file: the revision bumps and every
+    // session selection becomes stale.
+    expect(server.context.registry).toBeDefined();
+    server.context.registry?.publish();
+
+    const after = await callTool(acmeToken, 'get_session');
+    expect(after.isError).toBe(true);
+    expect(firstText(after)).toBe('No active session; select a connection first.');
+
+    const reselected = await callTool(acmeToken, 'select_connection', {
+      connectionId: 'acme-billing',
+    });
+    expect(reselected.isError).toBeFalsy();
+  });
+
+  it('clears active sessions when a connection is revoked', async () => {
+    await callTool(acmeToken, 'select_connection', {
+      connectionId: 'acme-billing',
+    });
+
+    const revoked = registryDocument(
+      acmeCatalogChecksum,
+      globexCatalogChecksum,
+      acmeKey,
+      globexKey,
+      `http://127.0.0.1:${upstreamPort}`,
+    );
+    revoked.principals = revoked.principals.map((principal) =>
+      principal.id === 'acme-user'
+        ? { ...principal, allowedConnectionIds: [] }
+        : principal,
+    );
+    revoked.connections = revoked.connections.filter(
+      (connection) => connection.id !== 'acme-billing',
+    );
+    writeRegistryFile(registryFile, revoked, 'json');
+    server.context.registry?.publish();
+
+    const listed = await callTool(acmeToken, 'list_connections');
+    const connections = (
+      JSON.parse(firstText(listed)) as {
+        connections: Array<{ id: string }>;
+      }
+    ).connections;
+    expect(connections).toEqual([]);
+
+    const after = await callTool(acmeToken, 'get_session');
+    expect(after.isError).toBe(true);
+    expect(firstText(after)).toBe('No active session; select a connection first.');
   });
 });

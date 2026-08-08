@@ -4,6 +4,29 @@ All notable changes to MCP Portico are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Packaging now builds a fresh `dist/` on pack: the `prepack` script runs the
+  production build before `pnpm pack` / `npm publish`, so tarballs never
+  contain stale build output.
+- The published package now includes the user-facing documentation the README
+  links to: the registry guide, migration notes, deprecation inventory, the
+  examples walkthrough, `CHANGELOG.md`, `CONTRIBUTING.md`, and `SECURITY.md`.
+  Dev-only documents and the architecture diagram are referenced via GitHub
+  URLs instead of being shipped.
+- `audit:deps` now uses `pnpm audit --prod`, which works with the pnpm
+  lockfile on Linux, macOS, and WSL (previously it invoked `npm audit`, which
+  requires a `package-lock.json`).
+- Linux and macOS CI release gates now include a dependency audit, separate
+  brand and secret sweeps, a clean-checkout documentation walkthrough
+  (import, timestamp-independent catalog reproduction via `catalog diff`,
+  registry validation, and key creation), and a package audit that also
+  checks dependency licenses and every relative link in the packaged
+  documentation. Windows CI keeps the same audits as a non-blocking
+  compatibility signal.
+
 ## [0.1.0] - 2026-08-08
 
 First generic release under Apache-2.0. MCP Portico turns OpenAPI descriptions

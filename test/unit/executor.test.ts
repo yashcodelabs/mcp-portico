@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import type { PorticoPrincipal } from '../../src/auth/types';
+import type { SecretResolver } from '../../src/auth/types';
 import { MemoryAuditLog } from '../../src/audit/log';
 import type {
   CatalogCachePolicy,
@@ -20,10 +21,15 @@ import type {
 import { compileCatalog } from '../../src/catalog/compile';
 import { LimitsStore } from '../../src/limits/store';
 import { snapshotFromDocument } from '../../src/registry/snapshot';
-import type { RegistryDocument } from '../../src/registry/types';
+import type {
+  ConnectionAuthConfig,
+  ConnectionPolicy,
+  RegistryDocument,
+} from '../../src/registry/types';
 import { CacheStore } from '../../src/runtime/cache';
 import { CircuitBreakerStore } from '../../src/runtime/circuit';
 import { createOperationExecutor } from '../../src/runtime/executor';
+import { catalogOperationAuthSatisfied } from '../../src/runtime/executor';
 import {
   confirmationTokenFor,
   type OperationExecutor,
@@ -211,6 +217,9 @@ interface SetupOverrides {
   failureThreshold?: number;
   validateResponses?: boolean;
   model?: NormalizedApiModel;
+  policy?: ConnectionPolicy;
+  auth?: ConnectionAuthConfig;
+  secrets?: SecretResolver;
 }
 
 interface SetupResult {
@@ -229,6 +238,20 @@ async function setup(
   const model = overrides.model ?? buildModel();
   const { catalog } = compileCatalog(model);
   const { port, close } = await startServer(handler);
+  const connectionPolicy =
+    overrides.policy !== undefined
+      ? overrides.policy
+      : overrides.rateLimitPerMinute !== undefined ||
+          overrides.maxResponseBytes !== undefined
+        ? {
+            ...(overrides.rateLimitPerMinute !== undefined
+              ? { rateLimitPerMinute: overrides.rateLimitPerMinute }
+              : {}),
+            ...(overrides.maxResponseBytes !== undefined
+              ? { maxResponseBytes: overrides.maxResponseBytes }
+              : {}),
+          }
+        : undefined;
   const document: RegistryDocument = {
     version: 1,
     tenants: [{ id: 'acme', name: 'Acme' }],
@@ -251,20 +274,8 @@ async function setup(
         backendId: 'echo',
         baseUrl: `http://127.0.0.1:${port}`,
         network: { allowedProtocols: ['http'], allowLoopback: true },
-        auth: { type: 'none' },
-        ...(overrides.rateLimitPerMinute !== undefined ||
-        overrides.maxResponseBytes !== undefined
-          ? {
-              policy: {
-                ...(overrides.rateLimitPerMinute !== undefined
-                  ? { rateLimitPerMinute: overrides.rateLimitPerMinute }
-                  : {}),
-                ...(overrides.maxResponseBytes !== undefined
-                  ? { maxResponseBytes: overrides.maxResponseBytes }
-                  : {}),
-              },
-            }
-          : {}),
+        auth: overrides.auth ?? { type: 'none' },
+        ...(connectionPolicy !== undefined ? { policy: connectionPolicy } : {}),
       },
       {
         id: 'other',
@@ -293,6 +304,7 @@ async function setup(
     }),
     health: new HealthStore(),
     ...(overrides.validateResponses === true ? { validateResponses: true } : {}),
+    ...(overrides.secrets !== undefined ? { secrets: overrides.secrets } : {}),
   });
   return { executor, principal, session, snapshot, catalog, close };
 }
@@ -724,5 +736,338 @@ describe('createOperationExecutor', () => {
     expect(unknownOperation.message).toBe(unauthorized.message);
     expect(unknownOperation.message).toBe('Operation not found or not authorized.');
     await env.close();
+  });
+
+  it('refuses operations disabled by the connection policy', async () => {
+    const env = await setup(jsonHandler({ ok: true }), {
+      policy: { disabledOperations: ['echo.get'] },
+    });
+    const error = await env.executor
+      .execute(
+        { snapshot: env.snapshot, session: env.session, principal: env.principal },
+        { operationId: 'echo.get', arguments: { id: 'x' } },
+      )
+      .then(
+        () => undefined,
+        (caught: unknown) => caught,
+      );
+    expect(error).toBeInstanceOf(PorticoError);
+    if (!(error instanceof PorticoError)) return;
+    expect(error.code).toBe('NOT_FOUND');
+    expect(error.message).toBe('Operation not found or not authorized.');
+    await env.close();
+  });
+
+  it('applies stricter connection confirmation to read operations', async () => {
+    const env = await setup(jsonHandler({ ok: true }), {
+      policy: { confirmation: 'always' },
+    });
+    const result = await env.executor.execute(
+      { snapshot: env.snapshot, session: env.session, principal: env.principal },
+      { operationId: 'echo.get', arguments: { id: 'x' } },
+    );
+    expect(result.requiresConfirmation).toBe(true);
+    if (!result.requiresConfirmation) return;
+    expect(result.token).toBe(
+      confirmationTokenFor(env.principal.id, 'echo.get', { id: 'x' }),
+    );
+    await env.close();
+  });
+
+  it('rejects request bodies above the connection request limit', async () => {
+    const env = await setup(jsonHandler({ ok: true }), {
+      policy: { maxRequestBytes: 8 },
+    });
+    const argumentsValue = { body: { message: 'hello world' } };
+    const error = await env.executor
+      .execute(
+        { snapshot: env.snapshot, session: env.session, principal: env.principal },
+        {
+          operationId: 'echo.post',
+          arguments: argumentsValue,
+          confirmationToken: confirmationTokenFor(
+            env.principal.id,
+            'echo.post',
+            argumentsValue,
+          ),
+        },
+      )
+      .then(
+        () => undefined,
+        (caught: unknown) => caught,
+      );
+    expect(error).toBeInstanceOf(PorticoError);
+    if (!(error instanceof PorticoError)) return;
+    expect(error.code).toBe('USAGE');
+    expect(error.message).toContain('byte limit');
+    await env.close();
+  });
+
+  it('bounds binary and multipart request bodies against the request limit', async () => {
+    const env = await setup(jsonHandler({ ok: true }), {
+      policy: { maxRequestBytes: 8 },
+    });
+    const binary = await env.executor
+      .execute(
+        { snapshot: env.snapshot, session: env.session, principal: env.principal },
+        {
+          operationId: 'echo.binary',
+          arguments: { body: Buffer.from('0123456789').toString('base64') },
+        },
+      )
+      .then(
+        () => undefined,
+        (caught: unknown) => caught,
+      );
+    const multipart = await env.executor
+      .execute(
+        { snapshot: env.snapshot, session: env.session, principal: env.principal },
+        {
+          operationId: 'echo.multipart',
+          arguments: {
+            body: { file: { base64: Buffer.from('file-bytes').toString('base64') } },
+          },
+        },
+      )
+      .then(
+        () => undefined,
+        (caught: unknown) => caught,
+      );
+    expect(binary).toBeInstanceOf(PorticoError);
+    expect(multipart).toBeInstanceOf(PorticoError);
+    if (!(binary instanceof PorticoError) || !(multipart instanceof PorticoError)) {
+      return;
+    }
+    expect(binary.code).toBe('USAGE');
+    expect(multipart.code).toBe('USAGE');
+    await env.close();
+  });
+
+  it('enforces allowed content types on requests and responses', async () => {
+    const env = await setup(
+      (_req, res) => {
+        res.writeHead(200, { 'content-type': 'text/plain' });
+        res.end('plain');
+      },
+      { policy: { allowedContentTypes: ['application/json'] } },
+    );
+
+    const requestBlocked = await env.executor
+      .execute(
+        { snapshot: env.snapshot, session: env.session, principal: env.principal },
+        { operationId: 'echo.text', arguments: { body: 'hello' } },
+      )
+      .then(
+        () => undefined,
+        (caught: unknown) => caught,
+      );
+    expect(requestBlocked).toBeInstanceOf(PorticoError);
+    if (!(requestBlocked instanceof PorticoError)) return;
+    expect(requestBlocked.code).toBe('USAGE');
+    expect(requestBlocked.message).toContain('content type');
+
+    const responseBlocked = await env.executor
+      .execute(
+        { snapshot: env.snapshot, session: env.session, principal: env.principal },
+        { operationId: 'echo.get', arguments: { id: 'x' } },
+      )
+      .then(
+        () => undefined,
+        (caught: unknown) => caught,
+      );
+    expect(responseBlocked).toBeInstanceOf(PorticoError);
+    if (!(responseBlocked instanceof PorticoError)) return;
+    expect(responseBlocked.code).toBe('API_ERROR');
+    expect(responseBlocked.message).toContain('content type');
+    await env.close();
+  });
+
+  it('applies connection-level redactions to JSON bodies and response headers', async () => {
+    const env = await setup(
+      (_req, res) => {
+        res.writeHead(200, {
+          'content-type': 'application/json',
+          'x-policy-secret': 'hidden',
+        });
+        res.end(JSON.stringify({ policySecret: 'leak', ok: true }));
+      },
+      {
+        policy: {
+          redactions: [{ fields: ['policySecret'], headers: ['x-policy-secret'] }],
+        },
+      },
+    );
+    const result = await env.executor.execute(
+      { snapshot: env.snapshot, session: env.session, principal: env.principal },
+      { operationId: 'echo.get', arguments: { id: 'x' } },
+    );
+    expect(result.requiresConfirmation).toBe(false);
+    if (result.requiresConfirmation) return;
+    expect(result.body).toEqual({
+      kind: 'json',
+      data: { policySecret: '<redacted>', ok: true },
+    });
+    expect(result.headers['x-policy-secret']).toBe('<redacted>');
+    await env.close();
+  });
+
+  it('redacts resolved credentials echoed in JSON, text, and binary responses', async () => {
+    const env = await setup(
+      (req, res, body) => {
+        if (req.url === '/text') {
+          res.writeHead(200, { 'content-type': 'text/plain' });
+          res.end('echo: super-secret-token');
+          return;
+        }
+        if (req.url === '/binary') {
+          res.writeHead(200, { 'content-type': 'application/octet-stream' });
+          res.end(Buffer.from('raw super-secret-token bytes', 'utf8'));
+          return;
+        }
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ echo: 'super-secret-token' }));
+      },
+      {
+        auth: { type: 'bearer', tokenRef: 'env:TEST_TOKEN' },
+        secrets: {
+          async resolve(reference: string): Promise<string | undefined> {
+            return reference === 'env:TEST_TOKEN' ? 'super-secret-token' : undefined;
+          },
+        },
+      },
+    );
+    const context = {
+      snapshot: env.snapshot,
+      session: env.session,
+      principal: env.principal,
+    };
+
+    const json = await env.executor.execute(context, {
+      operationId: 'echo.get',
+      arguments: { id: 'x' },
+    });
+    expect(json.requiresConfirmation).toBe(false);
+    if (json.requiresConfirmation) return;
+    expect(json.body).toEqual({ kind: 'json', data: { echo: '<redacted>' } });
+
+    const text = await env.executor.execute(context, {
+      operationId: 'echo.text',
+      arguments: { body: 'hello' },
+    });
+    expect(text.requiresConfirmation).toBe(false);
+    if (text.requiresConfirmation) return;
+    expect(text.body).toEqual({ kind: 'text', text: 'echo: <redacted>' });
+
+    const binary = await env.executor.execute(context, {
+      operationId: 'echo.binary',
+      arguments: { body: 'aGVsbG8=' },
+    });
+    expect(binary.requiresConfirmation).toBe(false);
+    if (binary.requiresConfirmation) return;
+    const decoded = Buffer.from(
+      binary.body?.kind === 'binary' ? (binary.body.base64 ?? '') : '',
+      'base64',
+    ).toString('utf8');
+    expect(decoded).toBe(`raw ${'*'.repeat('super-secret-token'.length)} bytes`);
+    await env.close();
+  });
+
+  it('enforces exact auth/catalog compatibility before execution', () => {
+    const securedModel: NormalizedApiModel = {
+      api: { id: 'secured', title: 'Secured API', version: '1.0.0' },
+      securitySchemes: {
+        bearer: { type: 'http', scheme: 'bearer' },
+        apiKey: { type: 'apiKey', in: 'header', name: 'X-API-Key' },
+        oauth2: { type: 'oauth2' },
+      },
+      operations: [
+        {
+          operationId: 'secured.get',
+          method: 'GET',
+          path: '/secured',
+          security: [['bearer']],
+          responses: {
+            '200': {
+              description: 'OK',
+              contentTypes: ['application/json'],
+            },
+          },
+        },
+        {
+          operationId: 'alt.get',
+          method: 'GET',
+          path: '/alt',
+          security: [['bearer'], ['apiKey']],
+          responses: {
+            '200': {
+              description: 'OK',
+              contentTypes: ['application/json'],
+            },
+          },
+        },
+        {
+          operationId: 'oauth.get',
+          method: 'GET',
+          path: '/oauth',
+          security: [['oauth2']],
+          responses: {
+            '200': {
+              description: 'OK',
+              contentTypes: ['application/json'],
+            },
+          },
+        },
+        {
+          operationId: 'public.get',
+          method: 'GET',
+          path: '/public',
+          responses: {
+            '200': {
+              description: 'OK',
+              contentTypes: ['application/json'],
+            },
+          },
+        },
+      ],
+    };
+    const { catalog } = compileCatalog(securedModel);
+    const bearerConnection = {
+      id: 'conn',
+      tenantId: 'acme',
+      backendId: 'secured',
+      baseUrl: 'http://127.0.0.1:9',
+      auth: { type: 'bearer', tokenRef: 'env:TOKEN' },
+    } as const;
+    const noneConnection = {
+      id: 'conn',
+      tenantId: 'acme',
+      backendId: 'secured',
+      baseUrl: 'http://127.0.0.1:9',
+      auth: { type: 'none' },
+    } as const;
+
+    const secured = catalog.operations['secured.get'] as NonNullable<
+      (typeof catalog.operations)[string]
+    >;
+    expect(catalogOperationAuthSatisfied(catalog, secured, noneConnection)).toBe(false);
+    expect(catalogOperationAuthSatisfied(catalog, secured, bearerConnection)).toBe(
+      true,
+    );
+
+    const alt = catalog.operations['alt.get'] as NonNullable<
+      (typeof catalog.operations)[string]
+    >;
+    expect(catalogOperationAuthSatisfied(catalog, alt, noneConnection)).toBe(false);
+    expect(catalogOperationAuthSatisfied(catalog, alt, bearerConnection)).toBe(true);
+
+    const oauth = catalog.operations['oauth.get'] as NonNullable<
+      (typeof catalog.operations)[string]
+    >;
+    expect(catalogOperationAuthSatisfied(catalog, oauth, bearerConnection)).toBe(false);
+
+    const pub = catalog.operations['public.get'] as NonNullable<
+      (typeof catalog.operations)[string]
+    >;
+    expect(catalogOperationAuthSatisfied(catalog, pub, noneConnection)).toBe(true);
   });
 });

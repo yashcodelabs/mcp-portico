@@ -116,7 +116,16 @@ function requireSession(principal: PorticoPrincipal, ctx: ToolContext): SessionS
   if (session === undefined) {
     throw new PorticoError('USAGE', 'No active session; select a connection first.');
   }
-  return ctx.runtime.assertSession(session, principal);
+  try {
+    return ctx.runtime.assertSession(session, principal);
+  } catch (error) {
+    // A stale or revoked session must not linger in the per-principal cache:
+    // drop it so the client selects a connection again on the next call.
+    if (isPorticoError(error) && error.code === 'AUTH') {
+      ctx.sessions.clear(principal.id);
+    }
+    throw error;
+  }
 }
 
 function catalogIndexFor(session: SessionState, ctx: ToolContext): CatalogIndex {

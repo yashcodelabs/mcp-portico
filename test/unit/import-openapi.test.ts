@@ -47,6 +47,20 @@ async function importMessage(
   }
 }
 
+async function importTempSpec(
+  spec: Record<string, unknown>,
+  options: Partial<ImportOptions> = {},
+) {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'portico-import-regression-'));
+  const file = path.join(directory, 'temp-spec.json');
+  writeFileSync(file, `${JSON.stringify(spec, null, 2)}\n`, 'utf8');
+  try {
+    return await importOpenApi(file, { apiId: 'x', now: FIXED_NOW, ...options });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 describe('OpenAPI/Swagger import', () => {
   it('matches the golden imported catalog byte-for-byte', async () => {
     const { catalog } = await importOpenApi(fixture('petstore.openapi30.json'), {
@@ -467,6 +481,483 @@ describe('OpenAPI/Swagger import', () => {
       limits: { maxBytesPerDocument: 128 },
     });
     expect(message).toContain('per-document limit');
+  });
+
+  it('keeps operations executable when an OR security alternative is supported', async () => {
+    const { catalog, report } = await importTempSpec({
+      openapi: '3.0.3',
+      info: { title: 'OR security', version: '1.0.0' },
+      paths: {
+        '/a': {
+          get: {
+            operationId: 'a.get',
+            responses: { 200: { description: 'ok' } },
+            security: [{ apiKey: [] }, { oauth2: [] }],
+          },
+        },
+        '/b': {
+          get: {
+            operationId: 'b.get',
+            responses: { 200: { description: 'ok' } },
+            security: [{ oauth2: [] }],
+          },
+        },
+      },
+      components: {
+        securitySchemes: {
+          apiKey: { type: 'apiKey', in: 'header', name: 'X-API-Key' },
+          oauth2: { type: 'oauth2' },
+        },
+      },
+    });
+    expect(catalog.operations['a.get']?.available).toBe(true);
+    expect(catalog.operations['b.get']?.available).toBe(false);
+    expect(report.catalog.available).toBe(1);
+    const unsupported = (catalog.provenance.warnings ?? []).filter(
+      (warning) => warning.code === 'UNSUPPORTED_SECURITY_SCHEME',
+    );
+    expect(unsupported).toHaveLength(2);
+    expect(
+      unsupported.some((warning) =>
+        warning.message.includes('stays available through a supported alternative'),
+      ),
+    ).toBe(true);
+    expect(
+      unsupported.some((warning) =>
+        warning.message.includes('operation is unavailable'),
+      ),
+    ).toBe(true);
+  });
+
+  it('fails closed on required request bodies with only unsupported content types', async () => {
+    const { catalog, report } = await importTempSpec({
+      openapi: '3.0.3',
+      info: { title: 'Unsupported bodies', version: '1.0.0' },
+      paths: {
+        '/xml-required': {
+          post: {
+            operationId: 'xml.required',
+            requestBody: {
+              required: true,
+              content: {
+                'application/xml': { schema: { type: 'object' } },
+              },
+            },
+            responses: { 200: { description: 'ok' } },
+          },
+        },
+        '/xml-optional': {
+          post: {
+            operationId: 'xml.optional',
+            requestBody: {
+              required: false,
+              content: {
+                'application/xml': { schema: { type: 'object' } },
+              },
+            },
+            responses: { 200: { description: 'ok' } },
+          },
+        },
+      },
+    });
+    expect(catalog.operations['xml.required']?.available).toBe(false);
+    expect(catalog.operations['xml.required']?.request?.body).toBeUndefined();
+    expect(catalog.operations['xml.optional']?.available).toBe(true);
+    expect(
+      (catalog.provenance.warnings ?? []).some(
+        (warning) => warning.code === 'UNSUPPORTED_REQUIRED_BODY',
+      ),
+    ).toBe(true);
+    expect(report.catalog.available).toBe(1);
+
+    const swagger = await importTempSpec(
+      {
+        swagger: '2.0',
+        info: { title: 'Unsupported bodies', version: '1.0.0' },
+        consumes: ['application/xml'],
+        produces: ['application/json'],
+        paths: {
+          '/xml-required': {
+            post: {
+              operationId: 'xml.required.swagger',
+              parameters: [
+                {
+                  name: 'body',
+                  in: 'body',
+                  required: true,
+                  schema: { type: 'object' },
+                },
+              ],
+              responses: { 200: { description: 'ok' } },
+            },
+          },
+        },
+      },
+      { apiId: 'swagger' },
+    );
+    expect(swagger.catalog.operations['xml.required.swagger']?.available).toBe(false);
+  });
+
+  it('preserves declared generic media types in the catalog', async () => {
+    const { catalog } = await importTempSpec({
+      openapi: '3.0.3',
+      info: { title: 'Media types', version: '1.0.0' },
+      paths: {
+        '/echo': {
+          post: {
+            operationId: 'echo',
+            requestBody: {
+              required: true,
+              content: {
+                'application/json; charset=utf-8': { schema: { type: 'object' } },
+                'application/vnd.api+json': { schema: { type: 'object' } },
+              },
+            },
+            responses: {
+              200: {
+                description: 'Echo',
+                content: {
+                  'text/plain; charset=utf-8': { schema: { type: 'string' } },
+                  'application/problem+json': { schema: { type: 'object' } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(catalog.operations['echo']?.request?.body?.contentTypes).toEqual([
+      'application/json; charset=utf-8',
+      'application/vnd.api+json',
+    ]);
+    expect(catalog.operations['echo']?.request?.body?.kind).toBe('json');
+    expect(catalog.operations['echo']?.responses?.['200']?.contentTypes).toEqual([
+      'text/plain; charset=utf-8',
+      'application/problem+json',
+    ]);
+  });
+
+  it('reports unsupported parameter serialization explicitly', async () => {
+    const { catalog, report } = await importTempSpec({
+      openapi: '3.0.3',
+      info: { title: 'Serialization', version: '1.0.0' },
+      paths: {
+        '/search': {
+          get: {
+            operationId: 'search',
+            parameters: [
+              {
+                name: 'tags',
+                in: 'query',
+                style: 'spaceDelimited',
+                explode: false,
+                schema: { type: 'array', items: { type: 'string' } },
+              },
+              {
+                name: 'filter',
+                in: 'query',
+                content: {
+                  'application/json': { schema: { type: 'object' } },
+                },
+              },
+              {
+                name: 'q',
+                in: 'query',
+                schema: { type: 'string' },
+              },
+            ],
+            responses: { 200: { description: 'ok' } },
+          },
+        },
+      },
+    });
+    expect(catalog.operations['search']?.available).toBe(true);
+    const serialization = report.unsupported.filter(
+      (feature) => feature.code === 'UNSUPPORTED_PARAMETER_SERIALIZATION',
+    );
+    expect(serialization.length).toBeGreaterThanOrEqual(4);
+    expect(
+      serialization.some((feature) => feature.message.includes('spaceDelimited')),
+    ).toBe(true);
+    expect(
+      serialization.some((feature) => feature.message.includes('explode: false')),
+    ).toBe(true);
+    expect(
+      serialization.some((feature) =>
+        feature.message.includes('content-based serialization'),
+      ),
+    ).toBe(true);
+    expect(serialization.some((feature) => feature.message.includes('array'))).toBe(
+      true,
+    );
+
+    const swagger = await importTempSpec(
+      {
+        swagger: '2.0',
+        info: { title: 'Serialization', version: '1.0.0' },
+        paths: {
+          '/search': {
+            get: {
+              operationId: 'search.swagger',
+              parameters: [
+                {
+                  name: 'tags',
+                  in: 'query',
+                  type: 'array',
+                  items: { type: 'string' },
+                  collectionFormat: 'multi',
+                },
+              ],
+              responses: { 200: { description: 'ok' } },
+            },
+          },
+        },
+      },
+      { apiId: 'swagger' },
+    );
+    expect(
+      swagger.report.unsupported.some(
+        (feature) =>
+          feature.code === 'UNSUPPORTED_PARAMETER_SERIALIZATION' &&
+          feature.message.includes('collectionFormat "multi"'),
+      ),
+    ).toBe(true);
+  });
+
+  it('sanitizes server hints and redacts example credentials', async () => {
+    const { catalog, report } = await importTempSpec({
+      openapi: '3.0.3',
+      info: { title: 'Credentials', version: '1.0.0' },
+      servers: [
+        { url: 'https://user:pass@api.example.com/v1?api_key=abc#frag' },
+        { url: 'https://api.example.com/plain' },
+      ],
+      paths: {
+        '/echo': {
+          post: {
+            operationId: 'echo',
+            requestBody: {
+              content: {
+                'application/json': {
+                  schema: { type: 'object' },
+                  example: {
+                    apiKey: 'sk-secret-value',
+                    headers: { Authorization: 'Bearer token-value' },
+                    name: 'Rex',
+                  },
+                },
+              },
+            },
+            responses: { 200: { description: 'ok' } },
+          },
+        },
+      },
+    });
+    expect(report.hints.servers).toEqual([
+      'https://api.example.com/v1',
+      'https://api.example.com/plain',
+    ]);
+    expect(
+      report.unsupported.some(
+        (feature) =>
+          feature.code === 'SANITIZED_SERVER_HINT' &&
+          feature.message.includes('userinfo, query, or fragment'),
+      ),
+    ).toBe(true);
+    const serialized = JSON.stringify(catalog);
+    expect(serialized).not.toContain('sk-secret-value');
+    expect(serialized).not.toContain('token-value');
+    const examples = catalog.operations['echo']?.examples ?? [];
+    expect(examples).toContainEqual({
+      location: 'request',
+      contentType: 'application/json',
+      example: {
+        apiKey: '<redacted>',
+        headers: { Authorization: '<redacted>' },
+        name: 'Rex',
+      },
+    });
+  });
+
+  it('sanitizes protected overlay headers during import', async () => {
+    const overlay = {
+      overlayVersion: '1.0',
+      apiId: 'x',
+      operations: {
+        echo: {
+          headers: {
+            Authorization: 'Bearer secret-value',
+            'X-Trace-Id': 'trace-123',
+          },
+        },
+      },
+    };
+    const { catalog, report } = await importTempSpec(
+      {
+        openapi: '3.0.3',
+        info: { title: 'Overlay headers', version: '1.0.0' },
+        paths: {
+          '/echo': {
+            get: {
+              operationId: 'echo',
+              responses: { 200: { description: 'ok' } },
+            },
+          },
+        },
+      },
+      { overlay },
+    );
+    expect(catalog.operations['echo']?.headers).toEqual({ 'X-Trace-Id': 'trace-123' });
+    expect(JSON.stringify(catalog)).not.toContain('secret-value');
+    expect(
+      (catalog.provenance.warnings ?? []).some(
+        (warning) =>
+          warning.code === 'SANITIZED_PROTECTED_HEADER' &&
+          warning.message.includes('Authorization'),
+      ),
+    ).toBe(true);
+    expect(report.overlay).toEqual({ applied: true, operations: 1 });
+  });
+
+  it('rejects remote reference URLs that embed credentials', async () => {
+    const schemas = readFileSync(fixture('refs/schemas.json'), 'utf8');
+    const server = http.createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(schemas);
+    });
+    await new Promise<void>((resolveListen) =>
+      server.listen(0, '127.0.0.1', resolveListen),
+    );
+    const address = server.address();
+    const port = typeof address === 'object' && address ? address.port : 0;
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'portico-import-userinfo-'));
+    const specFile = path.join(directory, 'userinfo-root.json');
+    const spec = {
+      openapi: '3.0.3',
+      info: { title: 'Userinfo refs', version: '1.0.0' },
+      paths: {
+        '/pets/{petId}': {
+          get: {
+            operationId: 'getPet',
+            parameters: [
+              { name: 'petId', in: 'path', required: true, schema: { type: 'string' } },
+            ],
+            responses: {
+              '200': {
+                description: 'Pet',
+                content: {
+                  'application/json': {
+                    schema: {
+                      $ref: `http://alice:secret@127.0.0.1:${port}/schemas.json#/Pet`,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    writeFileSync(specFile, `${JSON.stringify(spec, null, 2)}\n`, 'utf8');
+    try {
+      const message = await importMessage(specFile, {
+        remoteRefs: {
+          kind: 'allow',
+          fileRefs: false,
+          urlRefs: true,
+          urlHosts: ['127.0.0.1'],
+          allowHttp: true,
+          allowPrivateNetwork: true,
+        },
+      });
+      expect(message).toContain('userinfo');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    }
+  });
+
+  it('enforces remote reference byte limits before buffering the full body', async () => {
+    const server = http.createServer((request, response) => {
+      if (request.url === '/declared') {
+        response.writeHead(200, {
+          'content-type': 'application/json',
+          'content-length': String(8 * 1024),
+        });
+        response.end('x'.repeat(8 * 1024));
+        return;
+      }
+      if (request.url === '/streamed') {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.write('x'.repeat(700));
+        response.end('x'.repeat(700));
+        return;
+      }
+      response.writeHead(404);
+      response.end();
+    });
+    await new Promise<void>((resolveListen) =>
+      server.listen(0, '127.0.0.1', resolveListen),
+    );
+    const address = server.address();
+    const port = typeof address === 'object' && address ? address.port : 0;
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'portico-import-size-'));
+    const specFile = path.join(directory, 'size-root.json');
+    const spec = {
+      openapi: '3.0.3',
+      info: { title: 'Size refs', version: '1.0.0' },
+      paths: {
+        '/pets/{petId}': {
+          get: {
+            operationId: 'getPet',
+            parameters: [
+              { name: 'petId', in: 'path', required: true, schema: { type: 'string' } },
+            ],
+            responses: {
+              '200': {
+                description: 'Pet',
+                content: {
+                  'application/json': {
+                    schema: {
+                      $ref: `http://127.0.0.1:${port}/declared#/Pet`,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    writeFileSync(specFile, `${JSON.stringify(spec, null, 2)}\n`, 'utf8');
+    const allow: ImportOptions['remoteRefs'] = {
+      kind: 'allow',
+      fileRefs: false,
+      urlRefs: true,
+      urlHosts: ['127.0.0.1'],
+      allowHttp: true,
+      allowPrivateNetwork: true,
+    };
+    try {
+      const declared = await importMessage(specFile, {
+        remoteRefs: allow,
+        limits: { maxBytesPerDocument: 1024 },
+      });
+      expect(declared).toContain('per-document limit');
+
+      const streamedSpec =
+        spec.paths['/pets/{petId}'].get.responses['200'].content['application/json'];
+      streamedSpec.schema.$ref = `http://127.0.0.1:${port}/streamed#/Pet`;
+      writeFileSync(specFile, `${JSON.stringify(spec, null, 2)}\n`, 'utf8');
+      const streamed = await importMessage(specFile, {
+        remoteRefs: allow,
+        limits: { maxBytesPerDocument: 1024 },
+      });
+      expect(streamed).toContain('per-document limit');
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+      await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
+    }
   });
 
   it('normalizes examples from request bodies, responses, and Swagger 2.0 maps', async () => {

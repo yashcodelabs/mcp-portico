@@ -7,14 +7,17 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { startServer, type RunningServer } from '../../src/cli/serve';
 import { CATALOG_CHECKSUM_EXCLUDE, checksum } from '../../src/catalog/canonical';
 import type { Catalog } from '../../src/catalog/types';
+import { generatePorticoKey } from '../../src/identity/keys';
 import { writeRegistryFile } from '../../src/registry/load';
 import type { RegistryDocument } from '../../src/registry/types';
-import { PACKAGE_NAME } from '../../src/shared/brand';
+import { envName, PACKAGE_NAME } from '../../src/shared/brand';
 import { PorticoError } from '../../src/shared/errors';
 
 const running: RunningServer[] = [];
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'portico-server-test-'));
 const originalToken = process.env.PORTICO_SERVER_TEST_TOKEN;
+const PEPPER = 'server-test-pepper';
+const originalPepper = process.env[envName('KEY_PEPPER')];
 
 afterEach(async () => {
   for (const server of running.splice(0)) {
@@ -65,12 +68,21 @@ function bearerCatalog(): Catalog {
 
 function loopbackRegistry(): { file: string; checksum: string } {
   const catalog = bearerCatalog();
+  const key = generatePorticoKey(PEPPER);
   const catalogFile = path.join(temporary, 'server-catalog.json');
   fs.writeFileSync(catalogFile, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');
   const document: RegistryDocument = {
     version: 1,
     tenants: [{ id: 'acme', name: 'Acme' }],
-    principals: [],
+    principals: [
+      {
+        id: 'acme-automation',
+        tenantId: 'acme',
+        allowedConnectionIds: ['probe-connection'],
+        keyId: key.keyId,
+        keyDigest: key.digest,
+      },
+    ],
     backends: [
       {
         id: 'probe-backend',
@@ -101,11 +113,14 @@ function loopbackRegistry(): { file: string; checksum: string } {
 
 beforeAll(() => {
   process.env.PORTICO_SERVER_TEST_TOKEN = 'server-test-token';
+  process.env[envName('KEY_PEPPER')] = PEPPER;
 });
 
 afterAll(() => {
   if (originalToken === undefined) delete process.env.PORTICO_SERVER_TEST_TOKEN;
   else process.env.PORTICO_SERVER_TEST_TOKEN = originalToken;
+  if (originalPepper === undefined) delete process.env[envName('KEY_PEPPER')];
+  else process.env[envName('KEY_PEPPER')] = originalPepper;
   fs.rmSync(temporary, { recursive: true, force: true });
 });
 
@@ -161,7 +176,7 @@ describe('Phase 1 HTTP server', () => {
     const server = await startServer({
       host: '127.0.0.1',
       port: 0,
-      authMode: 'none',
+      authMode: 'bearer',
       registryPath: file,
     });
     running.push(server);
@@ -171,7 +186,25 @@ describe('Phase 1 HTTP server', () => {
       authMode: string;
     };
     expect(body.registryRevision).toBe(1);
-    expect(body.authMode).toBe('none');
+    expect(body.authMode).toBe('bearer');
+  });
+
+  it('refuses unauthenticated mode when a tenant-aware registry is configured', async () => {
+    const { file } = loopbackRegistry();
+    let thrown: unknown;
+    try {
+      await startServer({
+        host: '127.0.0.1',
+        port: 0,
+        authMode: 'none',
+        registryPath: file,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(PorticoError);
+    expect((thrown as PorticoError).code).toBe('CONFIG_ERROR');
+    expect((thrown as PorticoError).message).toContain('synthetic');
   });
 
   it('refuses to start with bearer auth and no registry', async () => {
@@ -197,7 +230,7 @@ describe('Phase 1 HTTP server', () => {
       startServer({
         host: '127.0.0.1',
         port: 0,
-        authMode: 'none',
+        authMode: 'bearer',
         registryPath: file,
       }),
     ).rejects.toThrow(PorticoError);

@@ -234,6 +234,22 @@ describe('connection probe', () => {
     expect(result.headers['x-echo-token']).toBe('probe-secret-token');
   });
 
+  it('redacts query-injected API keys from the final URL', async () => {
+    const result = await executeProbe({
+      url: new URL(`http://127.0.0.1:${port}/probe`),
+      auth: {
+        type: 'apiKey',
+        in: 'query',
+        name: 'api_key',
+        valueRef: 'env:PORTICO_TEST_TOKEN',
+      },
+      network: { allowedProtocols: ['http'], allowLoopback: true },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.finalUrl).not.toContain('probe-secret-token');
+    expect(result.finalUrl).toContain('api_key=%3Credacted%3E');
+  });
+
   it('refuses loopback destinations without permission', async () => {
     await expect(
       executeProbe({

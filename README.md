@@ -17,7 +17,7 @@ systems while isolating tenants, credentials, catalogs, and runtime sessions.
 > backend-analysis skill, the read-only tenant-scoped inspector, examples,
 > migration notes, and release packaging. This repository is a fresh
 > implementation following the
-> [implementation plan](docs/mcp-portico-implementation-plan.md).
+> [implementation plan](https://github.com/yashcodelabs/mcp-portico/blob/main/docs/mcp-portico-implementation-plan.md).
 
 ## Why MCP Portico
 
@@ -33,7 +33,7 @@ systems while isolating tenants, credentials, catalogs, and runtime sessions.
 
 ## Architecture
 
-![MCP Portico architecture](docs/assets/mcp-portico-architecture.svg)
+![MCP Portico architecture](https://raw.githubusercontent.com/yashcodelabs/mcp-portico/main/docs/assets/mcp-portico-architecture.svg)
 
 ```mermaid
 flowchart LR
@@ -77,6 +77,20 @@ pnpm serve      # health server on http://127.0.0.1:3000
 ```
 
 `mcp-portico --help` and `mcp-portico serve` are available after `pnpm build`.
+
+## Install from npm
+
+The published `mcp-portico` package ships the CLI, the JSON Schemas, and the
+user-facing documentation: this README, the registry guide, migration notes,
+and the runnable [examples walkthrough](examples/README.md).
+
+```bash
+npm install -g mcp-portico
+mcp-portico --help
+```
+
+The package builds a fresh `dist/` on pack, so the tarball never contains
+stale build output.
 
 ## Interface
 
@@ -135,8 +149,10 @@ prefix):
 - `MCP_PORTICO_KEY_PEPPER` - required to create Portico API keys and to run in
   bearer auth mode. Keys are stored only as HMAC digests keyed by this pepper;
   losing it invalidates every key.
-- `MCP_PORTICO_AUTH_MODE` - `none` (loopback only) or `bearer` (default
-  `none`).
+- `MCP_PORTICO_AUTH_MODE` - `none` (loopback only, health-only serving without
+  a registry) or `bearer` (default `none`). `none` combined with `--registry`
+  fails startup: tenant-aware MCP tools, resources, and the inspector require
+  an authenticated principal, so serve a registry with `bearer`.
 - `MCP_PORTICO_HOST` / `MCP_PORTICO_PORT` - server bind address and port.
 - `MCP_PORTICO_CONFIG_HOME` - override the user config directory.
 
@@ -146,7 +162,7 @@ startup or connection activation.
 
 ## What's next
 
-All seven phases of the [implementation plan](docs/mcp-portico-implementation-plan.md)
+All seven phases of the [implementation plan](https://github.com/yashcodelabs/mcp-portico/blob/main/docs/mcp-portico-implementation-plan.md)
 are complete. Post-v1 roadmap items include MCP OAuth 2.1 authorization-server
 integration, database-backed administration, and multi-replica shared state.
 

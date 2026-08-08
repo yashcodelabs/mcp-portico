@@ -1,4 +1,5 @@
 import { PorticoError } from '../shared/errors';
+import { isProtectedUpstreamHeaderName } from '../security/headers';
 import { isSecretReference, resolveSecretOrLiteral } from './secrets';
 import type {
   SecretResolver,
@@ -55,6 +56,9 @@ const apiKeyProvider: UpstreamAuthProvider = {
         'apiKey auth requires a non-empty "name".',
       );
     }
+    if (location === 'header') {
+      assertInjectionHeaderAllowed(auth.config.name, 'apiKey auth');
+    }
   },
   async apply(request, auth, secrets) {
     const value = await secrets.resolve(auth.config.valueRef as string);
@@ -62,8 +66,10 @@ const apiKeyProvider: UpstreamAuthProvider = {
     const name = auth.config.name as string;
     if (auth.config.in === 'query') {
       request.query.set(name, value);
+      request.secretQueryParams ??= new Set();
+      request.secretQueryParams.add(name);
     } else {
-      request.headers.set(name.toLowerCase(), value);
+      setInjectedHeader(request, name, value, 'apiKey auth');
     }
   },
 };
@@ -100,6 +106,7 @@ const staticHeadersProvider: UpstreamAuthProvider = {
           `staticHeaders entry "${name}" must map to a non-empty string.`,
         );
       }
+      assertInjectionHeaderAllowed(name, 'staticHeaders auth');
     }
   },
   async apply(request, auth, secrets) {
@@ -107,10 +114,36 @@ const staticHeadersProvider: UpstreamAuthProvider = {
       (auth.config.headers as Record<string, string>) ?? {},
     )) {
       const resolved = await resolveSecretOrLiteral(value, secrets);
-      if (resolved !== undefined) request.headers.set(name.toLowerCase(), resolved);
+      if (resolved !== undefined) {
+        setInjectedHeader(request, name, resolved, 'staticHeaders auth');
+      }
     }
   },
 };
+
+/**
+ * Refuse to inject a reserved header (host, hop-by-hop, framing, Portico
+ * client identity). The bearer/basic providers own `authorization`; every
+ * other provider must never set it or any other protected header.
+ */
+function assertInjectionHeaderAllowed(name: string, owner: string): void {
+  if (isProtectedUpstreamHeaderName(name)) {
+    throw new PorticoError(
+      'CONFIG_ERROR',
+      `${owner} refused to inject protected header "${name}".`,
+    );
+  }
+}
+
+function setInjectedHeader(
+  request: UpstreamRequest,
+  name: string,
+  value: string,
+  owner: string,
+): void {
+  assertInjectionHeaderAllowed(name, owner);
+  request.headers.set(name.toLowerCase(), value);
+}
 
 function requireRef(auth: UpstreamConnectionAuth, field: string): void {
   const value = auth.config[field];

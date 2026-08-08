@@ -23,6 +23,9 @@ import { loadRegistryFile, writeRegistryFile } from '../registry/load';
 import { buildRegistrySnapshot } from '../registry/snapshot';
 import { executeProbe } from '../security/probe';
 import { startServer } from './serve';
+import { formatUsageSummary } from '../telemetry/format';
+import { loadAuditEvents } from '../telemetry/load';
+import { summarizeAudit } from '../telemetry/summary';
 
 function parsePort(value: string): number {
   const port = Number(value);
@@ -297,6 +300,39 @@ connection
       }
     },
   );
+
+const usage = program
+  .command('usage')
+  .description(
+    'Usage telemetry (v1: in-memory audit log; nothing is persisted automatically)',
+  );
+
+usage
+  .command('summary')
+  .description(
+    'Summarize audit events from a telemetry file (JSON array or JSONL); v1 telemetry is not persisted automatically',
+  )
+  .option('--file <file>', 'telemetry file with audit events (JSON array or JSONL)')
+  .option('--tenant <id>', 'restrict the summary to one tenant')
+  .action((options: { file?: string; tenant?: string }) => {
+    try {
+      if (options.file === undefined) {
+        console.log(
+          `${PRODUCT_NAME} usage summary\n` +
+            'No usage data available: v1 audit telemetry is in-memory only and is never written to disk.\n' +
+            'Pass --file <audit.json|audit.jsonl> (JSON array or JSONL of audit events) to summarize them.',
+        );
+        return;
+      }
+      const events = loadAuditEvents(options.file);
+      const summary = summarizeAudit(events, {
+        ...(options.tenant !== undefined ? { tenantId: options.tenant } : {}),
+      });
+      console.log(formatUsageSummary(summary));
+    } catch (error) {
+      handleError(error);
+    }
+  });
 
 const catalog = program
   .command('catalog')

@@ -167,7 +167,7 @@ describe('AI artifact import (--ai)', () => {
     expect(String((error as Error).message)).toContain('0 and 1');
   });
 
-  it('rejects out-of-range operation confidence at compile time', async () => {
+  it('rejects out-of-range operation confidence at import time', async () => {
     const doc = JSON.parse(aiDocument()) as Record<string, unknown>;
     ((doc.paths as Record<string, unknown>)['/orders'] as Record<string, unknown>).get =
       {
@@ -176,10 +176,92 @@ describe('AI artifact import (--ai)', () => {
         'x-mcp-portico': { confidence: 2, authStatus: 'resolved' },
       };
     const error = await importAi(JSON.stringify(doc)).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(CompileError);
-    expect((error as CompileError).issues.map((i) => i.code)).toContain(
-      'INVALID_AI_CONFIDENCE',
+    expect(isPorticoError(error)).toBe(true);
+    const details = (
+      error as {
+        details?: { issues?: Array<{ code: string }> };
+      }
+    ).details;
+    expect(details?.issues?.map((i) => i.code)).toContain(
+      'AI_OPERATION_CONFIDENCE_INVALID',
     );
+  });
+
+  it('fails closed when an operation lacks the x-mcp-portico block', async () => {
+    const doc = JSON.parse(aiDocument()) as Record<string, unknown>;
+    const get = (
+      (doc.paths as Record<string, unknown>)['/orders'] as Record<string, unknown>
+    ).get as Record<string, unknown>;
+    delete get['x-mcp-portico'];
+    const error = await importAi(JSON.stringify(doc)).catch((e: unknown) => e);
+    expect(isPorticoError(error)).toBe(true);
+    const issues = (
+      error as {
+        details?: { issues?: Array<{ code: string; location?: string }> };
+      }
+    ).details?.issues;
+    expect(issues?.map((issue) => issue.code)).toContain(
+      'AI_OPERATION_METADATA_REQUIRED',
+    );
+    expect(issues?.some((issue) => issue.location === '/paths/~1orders/get')).toBe(
+      true,
+    );
+  });
+
+  it('fails closed when an operation metadata block is malformed', async () => {
+    const doc = JSON.parse(aiDocument()) as Record<string, unknown>;
+    const get = (
+      (doc.paths as Record<string, unknown>)['/orders'] as Record<string, unknown>
+    ).get as Record<string, unknown>;
+    get['x-mcp-portico'] = 'not-an-object';
+    const error = await importAi(JSON.stringify(doc)).catch((e: unknown) => e);
+    expect(isPorticoError(error)).toBe(true);
+    const issues = (
+      error as {
+        details?: { issues?: Array<{ code: string }> };
+      }
+    ).details?.issues;
+    expect(issues?.map((issue) => issue.code)).toContain(
+      'AI_OPERATION_METADATA_INVALID',
+    );
+  });
+
+  it('fails closed when operation confidence or authStatus is missing or invalid', async () => {
+    const missingConfidence = JSON.parse(aiDocument()) as Record<string, unknown>;
+    const get = (
+      (missingConfidence.paths as Record<string, unknown>)['/orders'] as Record<
+        string,
+        unknown
+      >
+    ).get as Record<string, unknown>;
+    get['x-mcp-portico'] = { authStatus: 'resolved' };
+    const confidenceError = await importAi(JSON.stringify(missingConfidence)).catch(
+      (e: unknown) => e,
+    );
+    expect(
+      (
+        (confidenceError as { details?: { issues?: Array<{ code: string }> } }).details
+          ?.issues ?? []
+      ).map((issue) => issue.code),
+    ).toContain('AI_OPERATION_CONFIDENCE_INVALID');
+
+    const missingStatus = JSON.parse(aiDocument()) as Record<string, unknown>;
+    const post = (
+      (missingStatus.paths as Record<string, unknown>)['/orders'] as Record<
+        string,
+        unknown
+      >
+    ).post as Record<string, unknown>;
+    post['x-mcp-portico'] = { confidence: 0.9, authStatus: 'maybe' };
+    const statusError = await importAi(JSON.stringify(missingStatus)).catch(
+      (e: unknown) => e,
+    );
+    expect(
+      (
+        (statusError as { details?: { issues?: Array<{ code: string }> } }).details
+          ?.issues ?? []
+      ).map((issue) => issue.code),
+    ).toContain('AI_OPERATION_AUTH_STATUS_INVALID');
   });
 
   it('rejects malformed root warnings entries', async () => {

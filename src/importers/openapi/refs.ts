@@ -258,6 +258,12 @@ export class DocumentStore {
   }
 
   private assertUrlAllowed(url: URL): void {
+    if (url.username !== '' || url.password !== '') {
+      throw new PorticoError(
+        'CONFIG_ERROR',
+        `Remote reference "${url.href}" embeds credentials (userinfo); userinfo is not permitted in reference URLs.`,
+      );
+    }
     if (this.remotePolicy.kind !== 'allow' || !this.remotePolicy.urlRefs) {
       throw new PorticoError(
         'CONFIG_ERROR',
@@ -351,13 +357,21 @@ export class DocumentStore {
           `Remote reference "${current}" returned HTTP ${response.status}.`,
         );
       }
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.byteLength > this.limits.maxBytesPerDocument) {
+      const contentLength = Number(response.headers.get('content-length'));
+      if (
+        Number.isFinite(contentLength) &&
+        contentLength > this.limits.maxBytesPerDocument
+      ) {
         throw new PorticoError(
           'CONFIG_ERROR',
-          `Remote reference "${current}" is ${buffer.byteLength} bytes, exceeding the ${this.limits.maxBytesPerDocument}-byte per-document limit.`,
+          `Remote reference "${current}" declares ${contentLength} bytes via content-length, exceeding the ${this.limits.maxBytesPerDocument}-byte per-document limit.`,
         );
       }
+      const buffer = await readUrlBodyBounded(
+        response,
+        current.toString(),
+        this.limits.maxBytesPerDocument,
+      );
       const format = formatForUrl(current, buffer);
       return {
         key: current.toString(),
@@ -400,6 +414,55 @@ export class DocumentStore {
       isRoot: false,
     };
   }
+}
+
+/**
+ * Read a remote reference body with a hard byte ceiling enforced while
+ * streaming, so an oversized document is rejected before it is buffered in
+ * full. A `content-length` larger than the limit is rejected up front.
+ */
+async function readUrlBodyBounded(
+  response: Response,
+  label: string,
+  limit: number,
+): Promise<Buffer> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) {
+    const empty = Buffer.from(await response.arrayBuffer());
+    if (empty.byteLength > limit) {
+      throw new PorticoError(
+        'CONFIG_ERROR',
+        `Remote reference "${label}" exceeded the ${limit}-byte per-document limit while streaming.`,
+      );
+    }
+    return empty;
+  }
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value === undefined) continue;
+      total += value.byteLength;
+      if (total > limit) {
+        await reader.cancel().catch(() => undefined);
+        throw new PorticoError(
+          'CONFIG_ERROR',
+          `Remote reference "${label}" exceeded the ${limit}-byte per-document limit while streaming.`,
+        );
+      }
+      chunks.push(Buffer.from(value));
+    }
+  } catch (error) {
+    if (error instanceof PorticoError) throw error;
+    throw new PorticoError(
+      'CONFIG_ERROR',
+      `Failed to read remote reference body "${label}": ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+  return Buffer.concat(chunks);
 }
 
 /** Follow a chain of structural `$ref` objects with cycle detection. */

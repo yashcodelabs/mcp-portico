@@ -63,6 +63,23 @@ const PARAMETER_LOCATIONS: ReadonlySet<string> = new Set([
 
 const OPERATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
+/**
+ * Default parameter serialization per OAS 3 location. The v1 runtime renders
+ * scalar values with these defaults; anything else is reported, never
+ * silently assumed.
+ */
+const PARAMETER_STYLE_DEFAULTS: Record<
+  ParameterLocation,
+  { style: string; explode: boolean }
+> = {
+  path: { style: 'simple', explode: false },
+  query: { style: 'form', explode: true },
+  header: { style: 'simple', explode: false },
+  cookie: { style: 'form', explode: true },
+};
+
+const AI_AUTH_STATUSES = new Set(['resolved', 'unresolved', 'public']);
+
 export interface NormalizeOutcome {
   model: NormalizedApiModel;
   unsupported: UnsupportedFeature[];
@@ -75,6 +92,11 @@ export interface NormalizeOutcome {
 
 class Context {
   readonly unsupported: UnsupportedFeature[] = [];
+  readonly aiMetadataIssues: Array<{
+    code: string;
+    message: string;
+    location: string;
+  }> = [];
   readonly hints: { servers: string[]; basePath?: string; schemes: string[] } = {
     servers: [],
     schemes: [],
@@ -92,6 +114,19 @@ class Context {
       ...(location !== undefined ? { location } : {}),
     });
   }
+
+  noteAi(code: string, message: string, location: string): void {
+    this.aiMetadataIssues.push({ code, message, location });
+  }
+
+  throwIfAiMetadataInvalid(): void {
+    if (this.aiMetadataIssues.length === 0) return;
+    throw new PorticoError(
+      'CONFIG_ERROR',
+      'AI import requires valid operation-level "x-mcp-portico" metadata on every operation; the import fails closed.',
+      { details: { issues: this.aiMetadataIssues } },
+    );
+  }
 }
 
 export function normalizeDocument(
@@ -99,6 +134,7 @@ export function normalizeDocument(
   spec: SpecVersion,
   store: DocumentStore,
   apiId: string,
+  options: { requireAiOperationMetadata?: boolean } = {},
 ): NormalizeOutcome {
   const data = root.data as Record<string, unknown>;
   if (!isPlainObject(data)) {
@@ -116,8 +152,11 @@ export function normalizeDocument(
   };
   const model =
     spec.kind === 'swagger2'
-      ? normalizeSwagger2(root, api, ctx)
-      : normalizeOpenApi3(root, api, ctx);
+      ? normalizeSwagger2(root, api, ctx, options.requireAiOperationMetadata === true)
+      : normalizeOpenApi3(root, api, ctx, options.requireAiOperationMetadata === true);
+  if (options.requireAiOperationMetadata === true) {
+    ctx.throwIfAiMetadataInvalid();
+  }
   return { model, unsupported: ctx.unsupported, hints: ctx.hints };
 }
 
@@ -145,6 +184,7 @@ function normalizeSwagger2(
   root: LoadedDocument,
   api: ApiInfo,
   ctx: Context,
+  requireAiMetadata: boolean,
 ): NormalizedApiModel {
   const data = root.data as Record<string, unknown>;
   const securitySchemes = normalizeSecurityDefinitions(data.securityDefinitions, ctx);
@@ -157,7 +197,9 @@ function normalizeSwagger2(
   ctx.hints.schemes = schemes;
   if (host !== undefined) {
     for (const scheme of schemes.length > 0 ? schemes : ['https']) {
-      ctx.hints.servers.push(`${scheme}://${host}${basePath ?? ''}`);
+      ctx.hints.servers.push(
+        sanitizeServerUrl(`${scheme}://${host}${basePath ?? ''}`, ctx),
+      );
     }
   }
 
@@ -212,13 +254,21 @@ function normalizeSwagger2(
         examples,
       );
       operations.push(
-        buildOperation(op, METHOD_TO_HTTP[method] as HttpMethod, pathKey, {
-          parameters: split.parameters,
-          requestBody: split.body,
-          responses,
-          ...(examples.length > 0 ? { examples } : {}),
-          security: resolveSecurity(op.security, data.security),
-        }),
+        buildOperation(
+          op,
+          METHOD_TO_HTTP[method] as HttpMethod,
+          pathKey,
+          {
+            parameters: split.parameters,
+            requestBody: split.body,
+            responses,
+            ...(examples.length > 0 ? { examples } : {}),
+            security: resolveSecurity(op.security, data.security),
+            requiredBodyUnsupported: split.requiredBodyUnsupported,
+          },
+          ctx,
+          requireAiMetadata,
+        ),
       );
     }
     reportUnsupportedMethods(pathValue, pathKey, ctx);
@@ -287,10 +337,15 @@ function splitSwagger2Parameters(
   ctx: Context,
   pathKey: string,
   method: string,
-): { parameters: NormalizedParameter[]; body?: NormalizedRequestBody } {
+): {
+  parameters: NormalizedParameter[];
+  body?: NormalizedRequestBody;
+  requiredBodyUnsupported: boolean;
+} {
   const parametersOut: NormalizedParameter[] = [];
   const formParams: Array<Record<string, unknown>> = [];
   let body: NormalizedRequestBody | undefined;
+  let requiredBodyUnsupported = false;
 
   for (const located of parameters) {
     const param = located.value as Record<string, unknown>;
@@ -328,10 +383,13 @@ function splitSwagger2Parameters(
             ? { schema: ctx.store.bundleSchema(param.schema, located.doc) }
             : {}),
         };
+      } else if (param.required === true) {
+        requiredBodyUnsupported = true;
       }
     } else if (location === 'formData') {
       formParams.push(param);
     } else {
+      noteSwagger2ParameterSerialization(param, ctx, pathKey, method);
       const normalized = normalizeSwagger2Parameter(param);
       if (normalized !== undefined) parametersOut.push(normalized);
     }
@@ -362,7 +420,7 @@ function splitSwagger2Parameters(
     };
   }
 
-  return { parameters: parametersOut, body };
+  return { parameters: parametersOut, body, requiredBodyUnsupported };
 }
 
 function normalizeSwagger2Parameter(
@@ -387,6 +445,36 @@ function normalizeSwagger2Parameter(
       ? { schema: paramSchema(param) as Record<string, unknown> }
       : {}),
   };
+}
+
+/**
+ * Swagger 2.0 declares parameter serialization with `collectionFormat`.
+ * Only `csv` (the default, and the shape the v1 runtime renders) is
+ * supported; array/object values are stringified, so anything else is
+ * reported explicitly instead of silently mis-serialized.
+ */
+function noteSwagger2ParameterSerialization(
+  param: Record<string, unknown>,
+  ctx: Context,
+  pathKey: string,
+  method: string,
+): void {
+  if (!PARAMETER_LOCATIONS.has(String(param.in))) return;
+  const collectionFormat = param.collectionFormat;
+  if (collectionFormat !== undefined && collectionFormat !== 'csv') {
+    ctx.note(
+      'UNSUPPORTED_PARAMETER_SERIALIZATION',
+      `Parameter "${String(param.name)}" (${String(param.in)}) on ${method.toUpperCase()} ${pathKey} declares collectionFormat "${String(collectionFormat)}"; only "csv" is rendered in v1`,
+      locationOf(pathKey, method, 'parameters'),
+    );
+  }
+  if (param.type === 'array' || param.type === 'object') {
+    ctx.note(
+      'UNSUPPORTED_PARAMETER_SERIALIZATION',
+      `Parameter "${String(param.name)}" (${String(param.in)}) on ${method.toUpperCase()} ${pathKey} declares type "${String(param.type)}"; only scalar values are rendered faithfully in v1`,
+      locationOf(pathKey, method, 'parameters'),
+    );
+  }
 }
 
 const SWAGGER2_SCHEMA_KEYS = [
@@ -524,6 +612,7 @@ function normalizeOpenApi3(
   root: LoadedDocument,
   api: ApiInfo,
   ctx: Context,
+  requireAiMetadata: boolean,
 ): NormalizedApiModel {
   const data = root.data as Record<string, unknown>;
   const components = isPlainObject(data.components) ? data.components : {};
@@ -544,7 +633,7 @@ function normalizeOpenApi3(
 
   for (const server of asArray(data.servers, 'servers')) {
     if (isPlainObject(server) && typeof server.url === 'string') {
-      ctx.hints.servers.push(server.url);
+      ctx.hints.servers.push(sanitizeServerUrl(server.url, ctx));
     }
   }
 
@@ -618,13 +707,21 @@ function normalizeOpenApi3(
         examples,
       );
       operations.push(
-        buildOperation(op, METHOD_TO_HTTP[method] as HttpMethod, pathKey, {
-          parameters,
-          requestBody,
-          responses,
-          ...(examples.length > 0 ? { examples } : {}),
-          security: resolveSecurity(op.security, data.security),
-        }),
+        buildOperation(
+          op,
+          METHOD_TO_HTTP[method] as HttpMethod,
+          pathKey,
+          {
+            parameters,
+            requestBody: requestBody?.body,
+            responses,
+            ...(examples.length > 0 ? { examples } : {}),
+            security: resolveSecurity(op.security, data.security),
+            requiredBodyUnsupported: requestBody?.requiredBodyUnsupported === true,
+          },
+          ctx,
+          requireAiMetadata,
+        ),
       );
     }
     reportUnsupportedMethods(pathValue, pathKey, ctx);
@@ -749,6 +846,7 @@ function normalizeParameter3(
   } else if (param.schema !== undefined) {
     schema = ctx.store.bundleSchema(param.schema, located.doc);
   }
+  noteParameterSerialization3(param, schema, ctx, pathKey, method);
   return {
     in: location as ParameterLocation,
     name,
@@ -760,21 +858,70 @@ function normalizeParameter3(
   };
 }
 
+/**
+ * Report parameter serialization that the v1 runtime cannot render
+ * faithfully. Default styles are preserved; non-default `style`/`explode`,
+ * content-based parameters, and array/object schemas are reported
+ * explicitly instead of being silently mis-serialized.
+ */
+function noteParameterSerialization3(
+  param: Record<string, unknown>,
+  schema: Record<string, unknown> | undefined,
+  ctx: Context,
+  pathKey: string,
+  method: string,
+): void {
+  const location = String(param.in) as ParameterLocation;
+  const defaults = PARAMETER_STYLE_DEFAULTS[location];
+  const style = param.style;
+  if (style !== undefined && style !== defaults.style) {
+    ctx.note(
+      'UNSUPPORTED_PARAMETER_SERIALIZATION',
+      `Parameter "${String(param.name)}" (${location}) on ${method.toUpperCase()} ${pathKey} declares style "${String(style)}"; only the default "${defaults.style}" style is rendered in v1`,
+      locationOf(pathKey, method, 'parameters'),
+    );
+  }
+  const explode = param.explode;
+  if (explode !== undefined && explode !== defaults.explode) {
+    ctx.note(
+      'UNSUPPORTED_PARAMETER_SERIALIZATION',
+      `Parameter "${String(param.name)}" (${location}) on ${method.toUpperCase()} ${pathKey} declares explode: ${String(explode)}; only the default explode: ${String(defaults.explode)} is rendered in v1`,
+      locationOf(pathKey, method, 'parameters'),
+    );
+  }
+  if (isPlainObject(param.content)) {
+    const mediaTypes = Object.keys(param.content);
+    ctx.note(
+      'UNSUPPORTED_PARAMETER_SERIALIZATION',
+      `Parameter "${String(param.name)}" (${location}) on ${method.toUpperCase()} ${pathKey} declares content-based serialization${mediaTypes.length > 0 ? ` (${mediaTypes.join(', ')})` : ''}; media-type parameter serialization is not rendered in v1`,
+      locationOf(pathKey, method, 'parameters'),
+    );
+  }
+  if (schema?.type === 'array' || schema?.type === 'object') {
+    ctx.note(
+      'UNSUPPORTED_PARAMETER_SERIALIZATION',
+      `Parameter "${String(param.name)}" (${location}) on ${method.toUpperCase()} ${pathKey} declares type "${String(schema.type)}"; only scalar values are rendered faithfully in v1`,
+      locationOf(pathKey, method, 'parameters'),
+    );
+  }
+}
+
 function normalizeRequestBody3(
   located: Located,
   ctx: Context,
   pathKey: string,
   method: string,
   examplesOut: unknown[],
-): NormalizedRequestBody | undefined {
+): { body?: NormalizedRequestBody; requiredBodyUnsupported: boolean } {
   const body = located.value as Record<string, unknown>;
+  const required = body.required === true;
   if (!isPlainObject(body)) {
     ctx.note(
       'INVALID_REQUEST_BODY',
       `Request body for ${method.toUpperCase()} ${pathKey} is not an object and was skipped.`,
       locationOf(pathKey, method, 'requestBody'),
     );
-    return undefined;
+    return { requiredBodyUnsupported: required };
   }
   const content = body.content;
   if (!isPlainObject(content)) {
@@ -783,7 +930,7 @@ function normalizeRequestBody3(
       `Request body for ${method.toUpperCase()} ${pathKey} has no "content" map and was not imported.`,
       locationOf(pathKey, method, 'requestBody'),
     );
-    return undefined;
+    return { requiredBodyUnsupported: required };
   }
   const entries = Object.entries(content);
   collectMediaExamples(content, 'request', located.doc, ctx.store, examplesOut);
@@ -810,7 +957,9 @@ function normalizeRequestBody3(
       });
     }
   }
-  if (supported.length === 0) return undefined;
+  if (supported.length === 0) {
+    return { requiredBodyUnsupported: required };
+  }
   const firstKind = supported[0]?.kind;
   const kept = supported.filter((entry) => entry.kind === firstKind);
   for (const entry of supported.filter((item) => item.kind !== firstKind)) {
@@ -822,11 +971,14 @@ function normalizeRequestBody3(
   }
   const primary = kept[0];
   return {
-    contentTypes: kept.map((entry) => entry.contentType),
-    required: body.required === true,
-    ...(primary !== undefined && primary.schema !== undefined
-      ? { schema: ctx.store.bundleSchema(primary.schema, located.doc) }
-      : {}),
+    body: {
+      contentTypes: kept.map((entry) => entry.contentType),
+      required,
+      ...(primary !== undefined && primary.schema !== undefined
+        ? { schema: ctx.store.bundleSchema(primary.schema, located.doc) }
+        : {}),
+    },
+    requiredBodyUnsupported: false,
   };
 }
 
@@ -927,6 +1079,7 @@ interface OperationExtras {
   responses: Record<string, NormalizedResponse>;
   examples?: unknown[];
   security: string[][];
+  requiredBodyUnsupported?: boolean;
 }
 
 function buildOperation(
@@ -934,8 +1087,12 @@ function buildOperation(
   method: HttpMethod,
   pathKey: string,
   extras: OperationExtras,
+  ctx: Context,
+  requireAiMetadata: boolean,
 ): NormalizedOperation {
-  const aiExt = parseAiOperationExtension(op['x-mcp-portico']);
+  const aiExt = requireAiMetadata
+    ? requireAiOperationExtension(op['x-mcp-portico'], method, pathKey, ctx)
+    : undefined;
   const operationId = op.operationId;
   let normalizedId: string | undefined;
   if (typeof operationId === 'string' && operationId !== '') {
@@ -961,6 +1118,9 @@ function buildOperation(
     ...(extras.examples !== undefined && extras.examples.length > 0
       ? { examples: extras.examples }
       : {}),
+    ...(extras.requiredBodyUnsupported === true
+      ? { requiredBodyUnsupported: true }
+      : {}),
     ...(aiExt?.confidence !== undefined ? { aiConfidence: aiExt.confidence } : {}),
     ...(aiExt?.authStatus !== undefined ? { aiAuthStatus: aiExt.authStatus } : {}),
     security: extras.security,
@@ -969,26 +1129,66 @@ function buildOperation(
 }
 
 interface AiOperationExtension {
-  confidence?: number;
-  authStatus?: 'resolved' | 'unresolved' | 'public';
+  confidence: number;
+  authStatus: 'resolved' | 'unresolved' | 'public';
 }
 
 /**
- * Parse the operation-level `x-mcp-portico` vendor extension used by AI
- * analysis artifacts. Unknown or malformed values are ignored; range checks
- * happen in the compiler so every path fails closed.
+ * Strictly parse the operation-level `x-mcp-portico` vendor extension used
+ * by AI analysis artifacts. AI mode fails closed: every operation must carry
+ * a well-formed block with an in-range confidence and a valid authStatus,
+ * otherwise the import is rejected with per-operation issues.
  */
-function parseAiOperationExtension(raw: unknown): AiOperationExtension | undefined {
-  if (!isPlainObject(raw)) return undefined;
-  const out: AiOperationExtension = {};
-  if (typeof raw.confidence === 'number') {
-    out.confidence = raw.confidence;
+function requireAiOperationExtension(
+  raw: unknown,
+  method: HttpMethod,
+  pathKey: string,
+  ctx: Context,
+): AiOperationExtension | undefined {
+  const location = locationOf(pathKey, method.toLowerCase());
+  if (raw === undefined) {
+    ctx.noteAi(
+      'AI_OPERATION_METADATA_REQUIRED',
+      `operation ${method} ${pathKey} is missing the required "x-mcp-portico" metadata block`,
+      location,
+    );
+    return undefined;
+  }
+  if (!isPlainObject(raw)) {
+    ctx.noteAi(
+      'AI_OPERATION_METADATA_INVALID',
+      `operation ${method} ${pathKey}: "x-mcp-portico" must be an object`,
+      location,
+    );
+    return undefined;
+  }
+  const rawConfidence = raw.confidence;
+  const confidenceInvalid =
+    typeof rawConfidence !== 'number' ||
+    !Number.isFinite(rawConfidence) ||
+    rawConfidence < 0 ||
+    rawConfidence > 1;
+  if (confidenceInvalid) {
+    ctx.noteAi(
+      'AI_OPERATION_CONFIDENCE_INVALID',
+      `operation ${method} ${pathKey}: "x-mcp-portico.confidence" must be a number between 0 and 1`,
+      location,
+    );
   }
   const status = raw.authStatus;
-  if (status === 'resolved' || status === 'unresolved' || status === 'public') {
-    out.authStatus = status;
+  const statusInvalid = typeof status !== 'string' || !AI_AUTH_STATUSES.has(status);
+  if (statusInvalid) {
+    ctx.noteAi(
+      'AI_OPERATION_AUTH_STATUS_INVALID',
+      `operation ${method} ${pathKey}: "x-mcp-portico.authStatus" must be one of "resolved", "unresolved", or "public"`,
+      location,
+    );
   }
-  return Object.keys(out).length > 0 ? out : undefined;
+  if (confidenceInvalid || statusInvalid) return undefined;
+  return {
+    confidence: rawConfidence as number,
+    authStatus: status as AiOperationExtension['authStatus'],
+  };
 }
 
 /**
@@ -1061,6 +1261,43 @@ function splitSupported(contentTypes: string[]): {
     else dropped.push(contentType);
   }
   return { kept, dropped };
+}
+
+/**
+ * Server URLs are recorded only as non-authoritative review hints, so they
+ * are sanitized before they reach the report: embedded userinfo (which would
+ * otherwise leak credentials) and query/fragment data are stripped.
+ */
+function sanitizeServerUrl(raw: string, ctx: Context): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    // Relative or otherwise unparseable URLs are kept as declared; they
+    // cannot carry userinfo.
+    return raw;
+  }
+  let changed = false;
+  if (parsed.username !== '' || parsed.password !== '') {
+    parsed.username = '';
+    parsed.password = '';
+    changed = true;
+  }
+  if (parsed.search !== '') {
+    parsed.search = '';
+    changed = true;
+  }
+  if (parsed.hash !== '') {
+    parsed.hash = '';
+    changed = true;
+  }
+  if (changed) {
+    ctx.note(
+      'SANITIZED_SERVER_HINT',
+      `Server URL "${raw}" contained userinfo, query, or fragment data; the hint records only the sanitized URL.`,
+    );
+  }
+  return changed ? parsed.toString() : raw;
 }
 
 function isConcreteStatus(status: string): boolean {

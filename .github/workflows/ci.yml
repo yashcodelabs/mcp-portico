@@ -32,6 +32,8 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Dependency audit
+        run: pnpm audit:deps
       - name: Format check
         run: pnpm format:check
       - name: Typecheck
@@ -42,13 +44,35 @@ jobs:
         run: pnpm test:integration
       - name: Fixture validation
         run: pnpm test:fixtures
-      - name: Brand and secret sweep
-        run: pnpm sweep
+      - name: Brand audit
+        run: pnpm sweep:brand
+      - name: Secret audit
+        run: pnpm sweep:secrets
       - name: Build
         run: pnpm build
+      - name: Docs walkthrough (clean checkout)
+        run: |
+          set -euo pipefail
+          walk="$RUNNER_TEMP/portico-walkthrough"
+          rm -rf "$walk"
+          mkdir -p "$walk"
+          cp -R examples/. "$walk/"
+          node dist/cli/index.js catalog import "$walk/apis/petstore.openapi.yaml" \
+            --api-id petstore \
+            --output "$walk/apis/petstore.catalog.json" \
+            --report "$walk/petstore.report.json"
+          node dist/cli/index.js catalog validate "$walk/apis/petstore.catalog.json"
+          node dist/cli/index.js catalog diff examples/apis/petstore.catalog.json "$walk/apis/petstore.catalog.json"
+          node dist/cli/index.js catalog diff "$walk/apis/petstore.catalog.json" "$walk/apis/petstore.catalog.json"
+          node dist/cli/index.js registry validate "$walk/sample-registry.yaml"
+          MCP_PORTICO_KEY_PEPPER='walkthrough-pepper' node dist/cli/index.js key create \
+            --registry "$walk/sample-registry.yaml" --tenant acme --principal acme-automation >/dev/null
+          MCP_PORTICO_KEY_PEPPER='walkthrough-pepper' node dist/cli/index.js key create \
+            --registry "$walk/sample-registry.yaml" --tenant globex --principal globex-automation >/dev/null
+          MCP_PORTICO_KEY_PEPPER='walkthrough-pepper' node dist/cli/index.js registry validate "$walk/sample-registry.yaml"
       - name: CLI smoke test
         run: pnpm smoke
-      - name: Package smoke test
+      - name: Package, license, and docs audit
         run: pnpm test:pack
 
   windows-compat:
@@ -66,6 +90,8 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Dependency audit
+        run: pnpm audit:deps
       - name: Typecheck
         run: pnpm typecheck
       - name: Unit tests
@@ -74,9 +100,11 @@ jobs:
         run: pnpm test:integration
       - name: Fixture validation
         run: pnpm test:fixtures
-      - name: Brand and secret sweep
-        run: pnpm sweep
+      - name: Brand audit
+        run: pnpm sweep:brand
+      - name: Secret audit
+        run: pnpm sweep:secrets
       - name: Build
         run: pnpm build
-      - name: Package smoke test
+      - name: Package, license, and docs audit
         run: pnpm test:pack

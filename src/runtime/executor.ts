@@ -1,4 +1,8 @@
-import { defaultSecretResolver, resolveSecretOrLiteral } from '../auth/secrets';
+import {
+  defaultSecretResolver,
+  isSecretReference,
+  resolveSecretOrLiteral,
+} from '../auth/secrets';
 import {
   defaultUpstreamAuthRegistry,
   type UpstreamAuthRegistry,
@@ -6,9 +10,15 @@ import {
 import type { SecretResolver, UpstreamRequest } from '../auth/types';
 import { newAuditEvent, type AuditLog } from '../audit/log';
 import { canonicalize } from '../catalog/canonical';
-import type { Catalog, CatalogOperation, RedactionRule } from '../catalog/types';
+import type {
+  Catalog,
+  CatalogOperation,
+  ConfirmationPolicy,
+  RedactionRule,
+  SecurityScheme,
+} from '../catalog/types';
 import { scopeKey, type LimitsStore } from '../limits/store';
-import type { Connection } from '../registry/types';
+import type { Connection, ConnectionPolicy } from '../registry/types';
 import { sanitizeUpstreamHeaders } from '../security/headers';
 import { defaultRedactor, Redactor } from '../shared/redact';
 import { PorticoError } from '../shared/errors';
@@ -55,8 +65,10 @@ import {
  */
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_MAX_REQUEST_BYTES = 10 * 1024 * 1024;
 const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 const NOT_FOUND_MESSAGE = 'Operation not found or not authorized.';
+const SECRET_REDACTION = '<redacted>';
 
 export function createOperationExecutor(options: ExecutorOptions): OperationExecutor {
   return new OperationExecutorImpl(options);
@@ -95,7 +107,7 @@ class OperationExecutorImpl implements OperationExecutor {
     );
     const operationId = input.operationId;
 
-    if (needsConfirmation(operation)) {
+    if (needsConfirmation(operation, connection.policy)) {
       const expected = confirmationTokenFor(
         context.principal.id,
         operationId,
@@ -282,6 +294,12 @@ class OperationExecutorImpl implements OperationExecutor {
     ) {
       throw new PorticoError('NOT_FOUND', NOT_FOUND_MESSAGE);
     }
+    if (
+      connection.policy?.disabledOperations?.includes(operationId) === true ||
+      !catalogOperationAuthSatisfied(catalog, operation, connection)
+    ) {
+      throw new PorticoError('NOT_FOUND', NOT_FOUND_MESSAGE);
+    }
     return { operation, connection, catalog };
   }
 
@@ -336,18 +354,37 @@ class OperationExecutorImpl implements OperationExecutor {
     const provider = this.upstreamAuth.get(connection.auth.type);
     await provider.validate(auth);
     await provider.apply(request, auth, this.secrets);
+    // Defense in depth: an auth provider may only keep its own credential
+    // header; every other protected header is stripped again after injection.
+    sanitizeUpstreamHeaders(request.headers, {
+      allow:
+        connection.auth.type === 'bearer' || connection.auth.type === 'basic'
+          ? ['authorization']
+          : [],
+    });
     for (const [name, value] of request.query) {
       url.searchParams.set(name, value);
     }
 
+    const maxRequestBytes =
+      connection.policy?.maxRequestBytes ??
+      operation.maxRequestBytes ??
+      DEFAULT_MAX_REQUEST_BYTES;
     const encoded =
       validated.body === undefined
         ? undefined
-        : encodeRequestBody(operation.request?.body?.kind ?? 'json', validated.body);
+        : encodeRequestBody(operation.request?.body?.kind ?? 'json', validated.body, {
+            maxBytes: maxRequestBytes,
+          });
+    assertRequestContentTypeAllowed(
+      connection.policy?.allowedContentTypes,
+      encoded?.contentType,
+    );
     const requestHeaders: Record<string, string> = Object.fromEntries(request.headers);
     const init: DispatchInit = {
       method: operation.method,
       headers: requestHeaders,
+      redactQueryParams: request.secretQueryParams,
     };
     if (encoded?.body !== undefined) {
       init.body = encoded.body;
@@ -370,18 +407,29 @@ class OperationExecutorImpl implements OperationExecutor {
     });
     const durationMs = Date.now() - startedAt;
 
-    const redactedHeaders = this.redactor.redactHeaders(dispatched.headers) as Record<
-      string,
-      string
-    >;
+    const secrets = await collectUpstreamSecrets(connection, this.secrets);
+    const redactionRules = [
+      ...(connection.policy?.redactions ?? []),
+      ...(operation.redactions ?? []),
+    ];
+    const redactedHeaders = redactResponseHeaders(
+      dispatched.headers,
+      redactionRules,
+      this.redactor,
+    );
     const contentType = dispatched.headers['content-type'];
-    let body = buildResponseBody(dispatched.body, contentType);
-    if (body?.kind === 'json' && body.data !== undefined) {
-      body = {
-        ...body,
-        data: redactJsonData(body.data, operation.redactions, this.redactor),
-      };
-    }
+    assertResponseContentTypeAllowed(
+      connection.policy?.allowedContentTypes,
+      dispatched.body,
+      contentType,
+    );
+    const body = buildRedactedResponseBody(
+      dispatched.body,
+      contentType,
+      redactionRules,
+      secrets,
+      this.redactor,
+    );
 
     if (this.validateResponses) {
       this.validateResponse(operation, dispatched.status, body);
@@ -495,8 +543,18 @@ class OperationExecutorImpl implements OperationExecutor {
   }
 }
 
-function needsConfirmation(operation: CatalogOperation): boolean {
-  const confirmation = operation.confirmation;
+function effectiveConfirmation(
+  operation: CatalogOperation,
+  policy: ConnectionPolicy | undefined,
+): ConfirmationPolicy {
+  return policy?.confirmation ?? operation.confirmation;
+}
+
+function needsConfirmation(
+  operation: CatalogOperation,
+  policy: ConnectionPolicy | undefined,
+): boolean {
+  const confirmation = effectiveConfirmation(operation, policy);
   if (confirmation === 'always') return true;
   if (confirmation === 'write') return operation.risk !== 'read';
   if (confirmation === 'destructive') return operation.risk === 'destructive';
@@ -539,6 +597,222 @@ function redactJsonData(
     }
   }
   return out;
+}
+
+/**
+ * Build the redacted response body for every body kind:
+ * - JSON data is redacted by sensitive field names and by secret value;
+ * - text is redacted by secret value;
+ * - binary payloads have every occurrence of a resolved secret byte
+ *   sequence replaced before base64 encoding.
+ */
+function buildRedactedResponseBody(
+  raw: Buffer,
+  contentType: string | undefined,
+  rules: RedactionRule[],
+  secrets: string[],
+  baseRedactor: Redactor,
+): OperationResultBody | undefined {
+  const body = buildResponseBody(raw, contentType);
+  if (body?.kind === 'json' && body.data !== undefined) {
+    const data = redactDataSecrets(
+      redactJsonData(body.data, rules, baseRedactor),
+      secrets,
+    );
+    return { ...body, data };
+  }
+  if (body?.kind === 'text' && body.text !== undefined) {
+    return { ...body, text: redactStringSecrets(body.text, secrets) };
+  }
+  if (body?.kind === 'binary') {
+    return {
+      ...body,
+      base64: redactBufferSecrets(raw, secrets).toString('base64'),
+    };
+  }
+  return body;
+}
+
+function redactResponseHeaders(
+  headers: Record<string, string>,
+  rules: RedactionRule[],
+  baseRedactor: Redactor,
+): Record<string, string> {
+  let redacted = baseRedactor.redactHeaders(headers) as Record<string, string>;
+  const headerNames = rules.flatMap((rule) => rule.headers ?? []);
+  if (headerNames.length > 0) {
+    redacted = new Redactor({ sensitiveHeaders: headerNames }).redactHeaders(
+      redacted,
+    ) as Record<string, string>;
+  }
+  return redacted;
+}
+
+/** Resolve every credential the connection may have sent upstream. */
+async function collectUpstreamSecrets(
+  connection: Connection,
+  secrets: SecretResolver,
+): Promise<string[]> {
+  const values: string[] = [];
+  const resolve = (reference: string): Promise<string | undefined> =>
+    secrets.resolve(reference);
+  switch (connection.auth.type) {
+    case 'bearer': {
+      const token = await resolve(connection.auth.tokenRef);
+      if (token !== undefined) values.push(token, `Bearer ${token}`);
+      break;
+    }
+    case 'apiKey': {
+      const value = await resolve(connection.auth.valueRef);
+      if (value !== undefined) values.push(value);
+      break;
+    }
+    case 'basic': {
+      const username = await resolve(connection.auth.usernameRef);
+      const password = await resolve(connection.auth.passwordRef);
+      if (username !== undefined) values.push(username);
+      if (password !== undefined) values.push(password);
+      if (username !== undefined && password !== undefined) {
+        const encoded = Buffer.from(`${username}:${password}`, 'utf8').toString(
+          'base64',
+        );
+        values.push(encoded, `Basic ${encoded}`);
+      }
+      break;
+    }
+    case 'staticHeaders':
+      for (const value of Object.values(connection.auth.headers)) {
+        if (isSecretReference(value)) {
+          const resolved = await resolve(value);
+          if (resolved !== undefined) values.push(resolved);
+        }
+      }
+      break;
+    case 'none':
+      break;
+  }
+  for (const value of Object.values(connection.staticHeaders ?? {})) {
+    if (isSecretReference(value)) {
+      const resolved = await resolve(value);
+      if (resolved !== undefined) values.push(resolved);
+    }
+  }
+  return [...new Set(values)]
+    .filter((value) => value.length >= 4)
+    .sort((left, right) => right.length - left.length);
+}
+
+function redactStringSecrets(text: string, secrets: string[]): string {
+  let out = text;
+  for (const secret of secrets) {
+    out = out.split(secret).join(SECRET_REDACTION);
+  }
+  return out;
+}
+
+function redactDataSecrets(data: unknown, secrets: string[]): unknown {
+  if (typeof data === 'string') return redactStringSecrets(data, secrets);
+  if (Array.isArray(data)) {
+    return data.map((item) => redactDataSecrets(item, secrets));
+  }
+  if (data !== null && typeof data === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
+      out[key] = redactDataSecrets(value, secrets);
+    }
+    return out;
+  }
+  return data;
+}
+
+/** Replace every occurrence of a resolved secret's UTF-8 bytes with '*'. */
+function redactBufferSecrets(raw: Buffer, secrets: string[]): Buffer {
+  const out = Buffer.from(raw);
+  for (const secret of secrets) {
+    const needle = Buffer.from(secret, 'utf8');
+    if (needle.byteLength === 0 || needle.byteLength > out.byteLength) continue;
+    const replacement = Buffer.alloc(needle.byteLength, 0x2a);
+    let searchFrom = 0;
+    for (;;) {
+      const at = out.indexOf(needle, searchFrom);
+      if (at === -1) break;
+      replacement.copy(out, at);
+      searchFrom = at + needle.byteLength;
+    }
+  }
+  return out;
+}
+
+function mediaTypeOf(contentType: string | undefined): string {
+  return (contentType ?? '').split(';')[0]?.trim().toLowerCase() ?? '';
+}
+
+function assertRequestContentTypeAllowed(
+  allowed: string[] | undefined,
+  contentType: string | undefined,
+): void {
+  if (allowed === undefined || contentType === undefined) return;
+  const media = mediaTypeOf(contentType);
+  if (media === '' || !allowed.some((entry) => entry.toLowerCase() === media)) {
+    throw new PorticoError(
+      'USAGE',
+      'Request content type is not allowed by the connection policy.',
+    );
+  }
+}
+
+function assertResponseContentTypeAllowed(
+  allowed: string[] | undefined,
+  raw: Buffer,
+  contentType: string | undefined,
+): void {
+  if (allowed === undefined) return;
+  if (raw.length === 0 && contentType === undefined) return;
+  const media = mediaTypeOf(contentType);
+  if (media === '' || !allowed.some((entry) => entry.toLowerCase() === media)) {
+    throw new PorticoError(
+      'API_ERROR',
+      'Response content type is not allowed by the connection policy.',
+    );
+  }
+}
+
+/**
+ * A catalog operation's security requirements are satisfiable when at least
+ * one alternative is fully covered by the connection's auth type. Mirrors
+ * the registry validator's compatibility rule so execution enforces exact
+ * auth/catalog compatibility even for programmatically built snapshots.
+ */
+export function catalogOperationAuthSatisfied(
+  catalog: Catalog,
+  operation: CatalogOperation,
+  connection: Connection,
+): boolean {
+  if (operation.security.length === 0) return true;
+  return operation.security.some((alternative) =>
+    alternative.every((schemeName) => {
+      const scheme = catalog.securitySchemes[schemeName];
+      return scheme !== undefined && connectionSatisfiesScheme(connection, scheme);
+    }),
+  );
+}
+
+function connectionSatisfiesScheme(
+  connection: Connection,
+  scheme: SecurityScheme,
+): boolean {
+  switch (scheme.type) {
+    case 'http':
+      if (scheme.scheme === 'bearer') return connection.auth.type === 'bearer';
+      if (scheme.scheme === 'basic') return connection.auth.type === 'basic';
+      return false;
+    case 'apiKey':
+      return connection.auth.type === 'apiKey';
+    case 'oauth2':
+    case 'openIdConnect':
+    case 'mutualTLS':
+      return false;
+  }
 }
 
 function toBatchError(error: unknown): { code: string; message: string } {

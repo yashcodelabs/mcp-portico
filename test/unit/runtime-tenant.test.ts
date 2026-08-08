@@ -269,4 +269,27 @@ describe('TenantRuntime', () => {
       }),
     ).rejects.toThrow(/circuit breaker/i);
   });
+
+  it('refreshes the identity provider when the snapshot is updated', async () => {
+    const newKey = generatePorticoKey(PEPPER);
+    const nextDocument: RegistryDocument = {
+      ...document,
+      principals: document.principals.map((principal) =>
+        principal.id === 'acme-automation'
+          ? { ...principal, keyId: newKey.keyId, keyDigest: newKey.digest }
+          : principal,
+      ),
+    };
+    const next = snapshotFromDocument(
+      nextDocument,
+      new Map([[TEST_CATALOG_REF, sampleCatalog()]]),
+      2,
+    );
+
+    await expect(runtime.authenticate(newKey.token)).rejects.toThrow(PorticoError);
+    runtime.updateSnapshot(next);
+    const result = await runtime.authenticate(newKey.token);
+    expect(result.principal.id).toBe('acme-automation');
+    await expect(runtime.authenticate(key.token)).rejects.toThrow(PorticoError);
+  });
 });

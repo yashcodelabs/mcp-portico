@@ -82,11 +82,19 @@ export class TenantRuntime {
 
   /**
    * Swap to a newly published snapshot and invalidate affected session
-   * selections and cache entries. The previous snapshot stays active until
+   * selections and cache entries. Identity providers that hold a snapshot
+   * (for example static bearer keys) are refreshed so revocations and new
+   * keys take effect immediately. The previous snapshot stays active until
    * this call succeeds.
    */
   updateSnapshot(next: RegistrySnapshot): void {
     this.currentSnapshot = next;
+    const provider = this.identityProvider;
+    if (provider !== undefined) {
+      const refresh = (provider as { refresh?: (snapshot: RegistrySnapshot) => void })
+        .refresh;
+      if (typeof refresh === 'function') refresh.call(provider, next);
+    }
     this.sessions.invalidateForSnapshot(next);
     this.caches.clear();
     const validScopes = new Set<string>();

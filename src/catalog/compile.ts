@@ -1,7 +1,9 @@
-import { CATALOG_CHECKSUM_EXCLUDE, checksum } from './canonical';
+import { CATALOG_CHECKSUM_EXCLUDE, canonicalize, checksum } from './canonical';
 import { deriveBodyKind } from './content';
 import { generateOperationId } from './ids';
 import { formatSchemaIssues, validateOverlaySchema } from './schema';
+import { HEADER_PREFIX } from '../shared/brand';
+import { defaultRedactor } from '../shared/redact';
 import { AI_CONFIDENCE_THRESHOLD, COMPILER_VERSION } from './types';
 import { validateCatalog } from './validate';
 import type {
@@ -31,6 +33,29 @@ const DEFAULT_MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_MAX_CONCURRENCY = 4;
 
 const SUPPORTED_HTTP_SCHEMES = new Set(['bearer', 'basic']);
+
+/**
+ * Header names that must never be carried in a catalog artifact. They are
+ * either reserved hop-by-hop/framing headers, credentials that belong only
+ * to a connection's auth configuration, or Portico client identity headers.
+ */
+const PROTECTED_CATALOG_HEADERS = new Set([
+  'authorization',
+  'connection',
+  'content-length',
+  'cookie',
+  'expect',
+  'host',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'set-cookie',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'x-api-key',
+]);
 
 /**
  * Compile a normalized API model plus an optional policy overlay into a
@@ -132,11 +157,24 @@ export function compileCatalog(
         });
       }
     }
+    if (operation.requiredBodyUnsupported === true) {
+      available = false;
+      warnings.push({
+        code: 'UNSUPPORTED_REQUIRED_BODY',
+        message: `operation ${operationId}: required request body could not be imported because all declared content types are unsupported; operation is unavailable`,
+      });
+    }
 
     const risk = policy?.risk ?? operation.risk ?? defaultRisk(operation.method);
     const confirmation =
       policy?.confirmation ?? operation.confirmation ?? defaultConfirmation(risk);
     const request = compileRequest(operationId, operation, errors);
+    const operationHeaders = sanitizeOverlayHeaders(operationId, policy, warnings);
+    const operationExamples = sanitizeExamples(
+      operationId,
+      operation.examples,
+      warnings,
+    );
 
     operations[operationId] = {
       enabled: policy?.enabled ?? true,
@@ -162,9 +200,9 @@ export function compileCatalog(
         policy?.maxConcurrency ?? operation.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY,
       cache: mergeCache(policy?.cache, operation.cache),
       security,
-      headers: policy?.headers,
+      headers: operationHeaders,
       redactions: policy?.redactions ?? operation.redactions,
-      examples: operation.examples,
+      examples: operationExamples,
       request,
       responses: compileResponses(operation, errors),
     };
@@ -271,8 +309,13 @@ function resolveSecurity(
   schemes: Record<string, SecurityScheme>,
 ): { available: boolean; securityWarnings: CatalogWarning[] } {
   const warnings: CatalogWarning[] = [];
-  let available = true;
+  // Security requirements are OR-ed alternatives of AND-ed schemes. The
+  // operation is executable when at least one alternative is fully
+  // supported; an unsupported scheme in one alternative must not disable an
+  // operation that can still authenticate through another.
+  let available = security.length === 0;
   for (const alternative of security) {
+    let alternativeAvailable = true;
     for (const schemeName of alternative) {
       const scheme = schemes[schemeName];
       if (scheme === undefined) {
@@ -283,15 +326,22 @@ function resolveSecurity(
           },
         ]);
       }
-      if (!isSupportedScheme(scheme)) {
-        available = false;
-        warnings.push({
-          code: 'UNSUPPORTED_SECURITY_SCHEME',
-          message:
-            `operation ${operationId}: security scheme "${schemeName}" ` +
+      if (!isSupportedScheme(scheme)) alternativeAvailable = false;
+    }
+    if (alternativeAvailable) available = true;
+  }
+  for (const alternative of security) {
+    for (const schemeName of alternative) {
+      const scheme = schemes[schemeName];
+      if (scheme === undefined || isSupportedScheme(scheme)) continue;
+      warnings.push({
+        code: 'UNSUPPORTED_SECURITY_SCHEME',
+        message: available
+          ? `operation ${operationId}: security scheme "${schemeName}" ` +
+            `(${scheme.type}${scheme.scheme !== undefined ? `/${scheme.scheme}` : ''}) is not supported in v1; operation stays available through a supported alternative`
+          : `operation ${operationId}: security scheme "${schemeName}" ` +
             `(${scheme.type}${scheme.scheme !== undefined ? `/${scheme.scheme}` : ''}) is not supported in v1; operation is unavailable`,
-        });
-      }
+      });
     }
   }
   return { available, securityWarnings: warnings };
@@ -399,4 +449,62 @@ function mergeCache(
     eligible: policy?.eligible ?? operation?.eligible ?? false,
     ttlSeconds: policy?.ttlSeconds ?? operation?.ttlSeconds,
   };
+}
+
+/**
+ * Overlay-provided operation headers are inert catalog metadata, never a
+ * credential source (the runtime injects credentials only from the
+ * connection's auth configuration). Protected/reserved header names are
+ * dropped so a shared catalog artifact stays credential-free, and remaining
+ * credential-named header values are redacted.
+ */
+function sanitizeOverlayHeaders(
+  operationId: string,
+  policy: OperationPolicy | undefined,
+  warnings: CatalogWarning[],
+): Record<string, string> | undefined {
+  const headers = policy?.headers;
+  if (headers === undefined || Object.keys(headers).length === 0) return undefined;
+  const out: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    const normalized = name.toLowerCase();
+    if (
+      PROTECTED_CATALOG_HEADERS.has(normalized) ||
+      normalized.startsWith(HEADER_PREFIX) ||
+      normalized === 'x-mcp-portico'
+    ) {
+      warnings.push({
+        code: 'SANITIZED_PROTECTED_HEADER',
+        message: `operation ${operationId}: overlay header "${name}" is reserved/protected and was removed from the catalog`,
+      });
+      continue;
+    }
+    const redacted = defaultRedactor.redactHeaderValue(name, value);
+    out[name] = redacted === undefined ? value : redacted;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Examples are illustrative metadata that operators may share; credential-
+ * shaped fields and headers inside them are redacted before compilation so
+ * the catalog artifact carries no source credentials.
+ */
+function sanitizeExamples(
+  operationId: string,
+  examples: unknown[] | undefined,
+  warnings: CatalogWarning[],
+): unknown[] | undefined {
+  if (examples === undefined || examples.length === 0) return undefined;
+  const sanitized = examples.map((example) => defaultRedactor.redact(example));
+  const changed = sanitized.some(
+    (value, index) => canonicalize(value) !== canonicalize(examples[index]),
+  );
+  if (changed) {
+    warnings.push({
+      code: 'SANITIZED_EXAMPLE',
+      message: `operation ${operationId}: example values contained credential-shaped fields and were redacted`,
+    });
+  }
+  return sanitized;
 }

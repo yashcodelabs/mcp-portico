@@ -22,10 +22,22 @@ import {
  * recomputes the digest and compares in constant time.
  */
 export class StaticBearerIdentityProvider implements IdentityProvider {
+  private currentSnapshot: RegistrySnapshot;
+
   constructor(
-    private readonly snapshot: RegistrySnapshot,
+    snapshot: RegistrySnapshot,
     private readonly pepper: string,
-  ) {}
+  ) {
+    this.currentSnapshot = snapshot;
+  }
+
+  /**
+   * Point the provider at a newly published registry snapshot so key
+   * creation and revocation take effect without restarting the server.
+   */
+  refresh(snapshot: RegistrySnapshot): void {
+    this.currentSnapshot = snapshot;
+  }
 
   async validate(): Promise<void> {
     if (this.pepper === '') {
@@ -34,7 +46,7 @@ export class StaticBearerIdentityProvider implements IdentityProvider {
         'MCP_PORTICO_KEY_PEPPER must be set when bearer auth mode is enabled.',
       );
     }
-    const principals = this.snapshot.document.principals;
+    const principals = this.currentSnapshot.document.principals;
     if (principals.length === 0) {
       throw new PorticoError(
         'CONFIG_ERROR',
@@ -75,7 +87,7 @@ export class StaticBearerIdentityProvider implements IdentityProvider {
   async authenticate(credential: string): Promise<PorticoAuthResult | undefined> {
     const parsed = parsePorticoKey(credential);
     if (parsed === undefined) return undefined;
-    const principal = this.snapshot.document.principals.find(
+    const principal = this.currentSnapshot.document.principals.find(
       (candidate) => candidate.keyId === parsed.keyId,
     );
     if (principal === undefined || principal.keyDigest === undefined) {
@@ -84,7 +96,7 @@ export class StaticBearerIdentityProvider implements IdentityProvider {
     const expected = computeKeyDigest(parsed.secret, this.pepper);
     if (!constantTimeEqual(expected, principal.keyDigest)) return undefined;
     return {
-      principal: toPorticoPrincipal(principal, this.snapshot),
+      principal: toPorticoPrincipal(principal, this.currentSnapshot),
       authMethod: 'static-bearer',
     };
   }

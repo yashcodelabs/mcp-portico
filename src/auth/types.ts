@@ -44,6 +44,12 @@ export interface UpstreamRequest {
   headers: Map<string, string>;
   /** Query parameters to inject when the auth scheme requires them. */
   query: Map<string, string>;
+  /**
+   * Names of query parameters whose values are secrets (for example an
+   * `apiKey` credential injected `in: query`). Any URL rendered from the
+   * request must redact these values before it can be observed.
+   */
+  secretQueryParams?: Set<string>;
 }
 
 export interface UpstreamConnectionAuth {

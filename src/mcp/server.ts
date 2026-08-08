@@ -2,15 +2,21 @@
  * MCP streamable-HTTP transport handler.
  *
  * One endpoint (`POST /mcp`) speaks JSON-RPC 2.0. `initialize` is
- * unauthenticated; `tools/list` and `tools/call` require an
+ * unauthenticated; `tools/*` and `resources/*` require an
  * `Authorization: Bearer mpp_...` Portico API key. Application failures are
  * reported with JSON-RPC error codes in the -320xx server range and the
  * matching Portico code in `error.data`.
+ *
+ * The transport is request/response only (no SSE), so the server never
+ * pushes notifications: `capabilities` advertises exactly the surface that
+ * works over the current JSON-RPC exchange. Resource payloads embed the
+ * registry revision so clients can detect reloads and re-read metadata.
  */
 
 import type { PorticoPrincipal } from '../auth/types';
 import type { TenantRuntime } from '../runtime/tenant';
 import { PRODUCT_VERSION } from '../shared/brand';
+import { summarizeAudit } from '../telemetry/summary';
 import {
   errorResponse,
   JSONRPC_ERROR_CODES,
@@ -38,10 +44,34 @@ export interface McpHttpResponse {
 
 const MCP_PROTOCOL_VERSION = '2025-06-18';
 const SERVER_INFO = { name: 'mcp-portico', version: PRODUCT_VERSION };
+const USAGE_RESOURCE_URI = 'mcp-portico://usage';
+const APIS_RESOURCE_URI = 'mcp-portico://apis';
+
+type AuthOk = { kind: 'ok'; principal: PorticoPrincipal; runtime: TenantRuntime };
 
 type AuthResult =
-  | { kind: 'ok'; principal: PorticoPrincipal; runtime: TenantRuntime }
-  | { kind: 'error'; status: number; response: JsonRpcErrorResponse };
+  AuthOk | { kind: 'error'; status: number; response: JsonRpcErrorResponse };
+
+interface ConnectionResourceView {
+  id: string;
+  backendId: string;
+  baseUrl: string;
+  catalog?: {
+    apiId: string;
+    title: string;
+    version: string;
+    checksum: string;
+    totals: { operations: number; available: number; enabled: number };
+    operations: Array<{
+      operationId: string;
+      method: string;
+      path: string;
+      risk: string;
+      available: boolean;
+      enabled: boolean;
+    }>;
+  };
+}
 
 export class McpServer {
   readonly tools: readonly McpTool[] = FIXED_TOOLS;
@@ -91,7 +121,14 @@ export class McpServer {
           200,
           success(id, {
             protocolVersion: MCP_PROTOCOL_VERSION,
-            capabilities: { tools: {} },
+            capabilities: {
+              tools: {},
+              // Resources are list/read only. subscribe and listChanged are
+              // intentionally not advertised: this transport cannot push
+              // server-to-client notifications, so clients detect changes
+              // by comparing `registryRevision` in resource payloads.
+              resources: {},
+            },
             serverInfo: SERVER_INFO,
           }),
         );
@@ -99,6 +136,10 @@ export class McpServer {
         return this.handleToolsList(id, headers);
       case 'tools/call':
         return this.handleToolsCall(id, headers, request.params);
+      case 'resources/list':
+        return this.handleResourcesList(id, headers);
+      case 'resources/read':
+        return this.handleResourcesRead(id, headers, request.params);
       default:
         return this.respond(
           200,
@@ -210,10 +251,176 @@ export class McpServer {
     }
     try {
       const auth = await this.runtime.authenticate(credential);
+      this.revalidateActiveSession(auth.principal);
       return { kind: 'ok', principal: auth.principal, runtime: this.runtime };
     } catch {
       return this.authFailure(id);
     }
+  }
+
+  /**
+   * Re-validate the principal's cached active session against the current
+   * snapshot after every successful authentication. A registry reload or a
+   * principal/connection revocation invalidates the canonical session store
+   * eagerly; this clears the per-principal cache so the client must select a
+   * connection again instead of reusing a stale session.
+   */
+  private revalidateActiveSession(principal: PorticoPrincipal): void {
+    if (this.runtime === undefined) return;
+    const session = this.sessions.get(principal.id);
+    if (session === undefined) return;
+    try {
+      this.runtime.assertSession(session, principal);
+    } catch {
+      this.sessions.clear(principal.id);
+    }
+  }
+
+  private async handleResourcesList(
+    id: JsonRpcId,
+    headers: Record<string, string | string[] | undefined>,
+  ): Promise<McpHttpResponse> {
+    const auth = await this.authenticate(id, headers);
+    if (auth.kind === 'error') return this.respond(auth.status, auth.response);
+    const connections = auth.runtime.authorizedConnections(auth.principal);
+    const resources = [
+      {
+        uri: USAGE_RESOURCE_URI,
+        name: 'Usage summary',
+        description:
+          'Tenant-scoped usage summary from in-memory audit events; not persisted and resets on restart.',
+        mimeType: 'application/json',
+      },
+      {
+        uri: APIS_RESOURCE_URI,
+        name: 'API Explorer',
+        description:
+          "Metadata for the authenticated principal's authorized connections and catalogs.",
+        mimeType: 'application/json',
+      },
+      ...connections.map((connection) => ({
+        uri: connectionResourceUri(connection.id),
+        name: `API: ${connection.id}`,
+        description: 'Catalog and connection metadata for one authorized connection.',
+        mimeType: 'application/json',
+      })),
+    ];
+    return this.respond(200, success(id, { resources }));
+  }
+
+  private async handleResourcesRead(
+    id: JsonRpcId,
+    headers: Record<string, string | string[] | undefined>,
+    params: unknown,
+  ): Promise<McpHttpResponse> {
+    const auth = await this.authenticate(id, headers);
+    if (auth.kind === 'error') return this.respond(auth.status, auth.response);
+    if (typeof params !== 'object' || params === null || Array.isArray(params)) {
+      return this.respond(
+        200,
+        errorResponse(id, JSONRPC_ERROR_CODES.INVALID_PARAMS, 'Invalid params'),
+      );
+    }
+    const uri = (params as Record<string, unknown>).uri;
+    if (typeof uri !== 'string' || uri === '') {
+      return this.respond(
+        200,
+        errorResponse(id, JSONRPC_ERROR_CODES.INVALID_PARAMS, 'Invalid params'),
+      );
+    }
+    const content = this.resourceContent(auth, uri);
+    if (content === undefined) {
+      // Same shape for unknown, unauthorized, and cross-tenant URIs.
+      return this.respond(
+        200,
+        errorResponse(id, JSONRPC_ERROR_CODES.INVALID_PARAMS, 'Unknown resource'),
+      );
+    }
+    return this.respond(200, success(id, { contents: [content] }));
+  }
+
+  private resourceContent(
+    auth: AuthOk,
+    uri: string,
+  ): { uri: string; mimeType: string; text: string } | undefined {
+    const revision = auth.runtime.snapshot.revision;
+    if (uri === USAGE_RESOURCE_URI) {
+      const events = auth.runtime.audit.forTenant(auth.principal.tenantId);
+      const summary = summarizeAudit(events, {
+        tenantId: auth.principal.tenantId,
+      });
+      return resourceContents(uri, {
+        resource: 'usage',
+        tenantId: auth.principal.tenantId,
+        registryRevision: revision,
+        ...summary,
+      });
+    }
+    if (uri === APIS_RESOURCE_URI) {
+      return resourceContents(uri, {
+        resource: 'apis',
+        tenantId: auth.principal.tenantId,
+        registryRevision: revision,
+        connections: this.connectionViews(auth),
+      });
+    }
+    const match = /^mcp-portico:\/\/apis\/([^/]+)$/.exec(uri);
+    if (match !== null) {
+      const connectionId = decodeURIComponent(match[1] ?? '');
+      const connection = this.connectionViews(auth).find(
+        (candidate) => candidate.id === connectionId,
+      );
+      if (connection === undefined) return undefined;
+      return resourceContents(uri, {
+        resource: 'connection',
+        tenantId: auth.principal.tenantId,
+        registryRevision: revision,
+        connection,
+      });
+    }
+    return undefined;
+  }
+
+  private connectionViews(auth: AuthOk): ConnectionResourceView[] {
+    const runtime = auth.runtime;
+    return runtime.authorizedConnections(auth.principal).map((connection) => {
+      const catalog = runtime.snapshot.catalogForConnection(connection.id);
+      return {
+        id: connection.id,
+        backendId: connection.backendId,
+        baseUrl: connection.baseUrl,
+        catalog:
+          catalog === undefined
+            ? undefined
+            : {
+                apiId: catalog.api.id,
+                title: catalog.api.title,
+                version: catalog.api.version,
+                checksum: catalog.checksum,
+                totals: {
+                  operations: Object.keys(catalog.operations).length,
+                  available: Object.values(catalog.operations).filter(
+                    (operation) => operation.available,
+                  ).length,
+                  enabled: Object.values(catalog.operations).filter(
+                    (operation) => operation.enabled,
+                  ).length,
+                },
+                operations: Object.entries(catalog.operations)
+                  .map(([operationId, operation]) => ({
+                    operationId,
+                    method: operation.method,
+                    path: operation.path,
+                    risk: operation.risk,
+                    available: operation.available,
+                    enabled: operation.enabled,
+                  }))
+                  .sort((left, right) =>
+                    left.operationId.localeCompare(right.operationId),
+                  ),
+              },
+      };
+    });
   }
 
   private authFailure(id: JsonRpcId): AuthResult {
@@ -249,4 +456,19 @@ function headerValue(
     return Array.isArray(value) ? (value[0] ?? undefined) : value;
   }
   return undefined;
+}
+
+function connectionResourceUri(connectionId: string): string {
+  return `${APIS_RESOURCE_URI}/${encodeURIComponent(connectionId)}`;
+}
+
+function resourceContents(
+  uri: string,
+  payload: unknown,
+): { uri: string; mimeType: string; text: string } {
+  return {
+    uri,
+    mimeType: 'application/json',
+    text: JSON.stringify(payload, null, 2),
+  };
 }

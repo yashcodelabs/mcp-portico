@@ -138,4 +138,30 @@ describe('StaticBearerIdentityProvider', () => {
       undefined,
     );
   });
+
+  it('refreshes the snapshot so new keys work and revoked keys stop working', async () => {
+    const oldDocument = keyedDocument();
+    const oldKey = generatePorticoKey(PEPPER);
+    oldDocument.principals[0]!.keyId = oldKey.keyId;
+    oldDocument.principals[0]!.keyDigest = oldKey.digest;
+
+    const newDocument = keyedDocument();
+    const newKey = generatePorticoKey(PEPPER);
+    newDocument.principals[0]!.keyId = newKey.keyId;
+    newDocument.principals[0]!.keyDigest = newKey.digest;
+
+    const provider = providerFor(oldDocument);
+    await expect(provider.authenticate(newKey.token)).resolves.toBeUndefined();
+
+    const next = snapshotFromDocument(
+      newDocument,
+      new Map([[TEST_CATALOG_REF, sampleCatalog()]]),
+      2,
+    );
+    provider.refresh(next);
+
+    await expect(provider.authenticate(oldKey.token)).resolves.toBeUndefined();
+    const result = await provider.authenticate(newKey.token);
+    expect(result?.principal.id).toBe('acme-automation');
+  });
 });
