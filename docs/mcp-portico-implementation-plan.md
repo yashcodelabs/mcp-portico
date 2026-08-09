@@ -610,6 +610,14 @@ No phase is complete merely because its code is merged. Its exit criteria and re
 
 ## 12. Post-v1 roadmap
 
+The maintained, prioritized roadmap is in
+[docs/roadmap.md](roadmap.md). Priority 1 covers generic product positioning,
+client-neutral examples, and the landing-page presentation. Priority 2 covers
+the MCP compatibility contract, interoperability tests, and explicit identity
+boundaries. OAuth and additional backend protocols remain later roadmap work.
+
+The longer-term backlog includes:
+
 - MCP OAuth 2.1 authorization-server integration
 - OAuth client-credentials and delegated upstream authentication
 - Database-backed registry and writable administration UI

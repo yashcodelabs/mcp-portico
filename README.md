@@ -19,6 +19,10 @@ systems while isolating tenants, credentials, catalogs, and runtime sessions.
 > implementation following the
 > [implementation plan](https://github.com/yashcodelabs/mcp-portico/blob/main/docs/mcp-portico-implementation-plan.md).
 
+**Roadmap:** The [generic MCP client roadmap](docs/roadmap.md) tracks the
+transition from a v1 HTTP API gateway to a client-neutral access layer for any
+MCP-compatible AI application.
+
 ## Why MCP Portico
 
 - **The catalog is the gate** - operations are compiled from OpenAPI/Swagger or
@@ -163,8 +167,9 @@ startup or connection activation.
 ## What's next
 
 All seven phases of the [implementation plan](https://github.com/yashcodelabs/mcp-portico/blob/main/docs/mcp-portico-implementation-plan.md)
-are complete. Post-v1 roadmap items include MCP OAuth 2.1 authorization-server
-integration, database-backed administration, and multi-replica shared state.
+are complete. The [roadmap](docs/roadmap.md) prioritizes generic MCP client
+positioning, interoperability, and identity-boundary work before later OAuth,
+additional backend protocols, and multi-replica administration.
 
 ## Contributing
 
