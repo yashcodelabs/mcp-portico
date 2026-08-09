@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/yashcodelabs/mcp-portico/security/advisories
+    about: Report suspected vulnerabilities privately; do not open a public issue.
+  - name: Documentation and integration guide
+    url: https://github.com/yashcodelabs/mcp-portico/tree/main/docs
+    about: Read the public contracts, migration notes, and integration guidance.

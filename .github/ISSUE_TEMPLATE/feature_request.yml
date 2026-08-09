@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose an improvement to MCP Portico.
+title: '[Feature]: '
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What user or operator problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the intended interface and behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe current workarounds or other approaches.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Security and compatibility impact
+      description: Explain tenant, credential, SSRF, MCP protocol, or migration implications. Write "None" when not applicable.
+    validations:
+      required: true

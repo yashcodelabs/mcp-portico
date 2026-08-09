@@ -57,40 +57,40 @@ MCP gateway for any AI application, not a coding-agent adapter.
 
 ### P1.1 Product language
 
-- [ ] Use “MCP clients,” “AI applications,” or “AI agents” as the primary
+- [x] Use “MCP clients,” “AI applications,” or “AI agents” as the primary
       terms; use coding products only as examples.
-- [ ] Update the README tagline, status text, feature descriptions, and
+- [x] Update the README tagline, status text, feature descriptions, and
       authentication explanation to use client-neutral language.
-- [ ] State explicitly that MCP Portico does not depend on a particular model,
+- [x] State explicitly that MCP Portico does not depend on a particular model,
       vendor, agent framework, or user-interface type.
-- [ ] Keep “coding assistant” examples where useful, but label them as one
+- [x] Keep “coding assistant” examples where useful, but label them as one
       client category among many.
-- [ ] Review CLI help, error text, documentation, examples, and repository
+- [x] Review CLI help, error text, documentation, examples, and repository
       metadata for accidental coding-agent assumptions.
 
 ### P1.2 Architecture and landing-page presentation
 
-- [ ] Change the primary diagram to show a generic “MCP-compatible AI
+- [x] Change the primary diagram to show a generic “MCP-compatible AI
       applications” block connected to MCP Portico.
-- [ ] Keep a small examples caption or legend for coding, support, workflow,
+- [x] Keep a small examples caption or legend for coding, support, workflow,
       BI, voice, and custom clients rather than making vendor logos the contract.
-- [ ] Preserve the three-block message: AI applications → MCP Portico →
+- [x] Preserve the three-block message: AI applications → MCP Portico →
       authorized backend systems.
-- [ ] Keep the diagram self-contained and renderable by GitHub without remote
+- [x] Keep the diagram self-contained and renderable by GitHub without remote
       nested images.
-- [ ] Add one short paragraph explaining that Portico is the security and
+- [x] Add one short paragraph explaining that Portico is the security and
       policy boundary between AI clients and internal systems.
 
 ### P1.3 Domain examples
 
-- [ ] Add a support-agent example that searches a ticketing API and reads a
+- [x] Add a support-agent example that searches a ticketing API and reads a
       customer profile through catalog-gated operations.
-- [ ] Add an operations or finance example that reads approved internal data
+- [x] Add an operations or finance example that reads approved internal data
       without exposing arbitrary database or service URLs.
-- [ ] Add a workflow-agent example that demonstrates confirmation for a
+- [x] Add a workflow-agent example that demonstrates confirmation for a
       mutating operation.
-- [ ] Keep examples credential-free and runnable with fixture backends.
-- [ ] Document which parts are generic MCP behavior and which parts are
+- [x] Keep examples credential-free and runnable with fixture backends.
+- [x] Document which parts are generic MCP behavior and which parts are
       backend-specific catalog configuration.
 
 ### Priority 1 acceptance criteria
@@ -111,48 +111,48 @@ remain server-owned.
 
 ### P2.1 Define the compatibility contract
 
-- [ ] Document the supported MCP lifecycle: initialize, capability
+- [x] Document the supported MCP lifecycle: initialize, capability
       negotiation, session handling, discovery, operation description, execution,
       errors, and shutdown.
-- [ ] Document the fixed Portico tool contract and its stable input/output
+- [x] Document the fixed Portico tool contract and its stable input/output
       shapes. Backend operations remain catalog data, not dynamically registered
       arbitrary tools.
-- [ ] Define the supported transport profiles separately, including local and
+- [x] Define the supported transport profiles separately, including local and
       remote deployment expectations. A client must not need backend-specific
       knowledge to choose a connection.
-- [ ] Specify limits and behavior for pagination, bulk calls, attachments,
+- [x] Specify limits and behavior for pagination, bulk calls, attachments,
       binary responses, confirmations, timeouts, and upstream failures.
-- [ ] Provide a short “MCP client integration” guide with examples for a
+- [x] Provide a short “MCP client integration” guide with examples for a
       generic host, a remote host, and a custom application.
 
 ### P2.2 Build the interoperability test matrix
 
-- [ ] Add protocol fixtures for initialization, capability negotiation, tool
+- [x] Add protocol fixtures for initialization, capability negotiation, tool
       discovery, descriptions, calls, errors, cancellation, and session cleanup.
-- [ ] Run the same contract tests against each supported transport profile.
-- [ ] Test clients with different request ordering, pagination sizes, and
+- [x] Run the same contract tests against each supported transport profile.
+- [x] Test clients with different request ordering, pagination sizes, and
       unknown optional fields to ensure the server remains forward-compatible.
-- [ ] Verify that unauthorized tools, connections, operations, and tenants
+- [x] Verify that unauthorized tools, connections, operations, and tenants
       fail with non-enumerating responses.
-- [ ] Keep the test harness independent of a specific model provider or agent
+- [x] Keep the test harness independent of a specific model provider or agent
       UI; use deterministic MCP messages and fixture backends.
-- [ ] Add Linux and macOS CI coverage for the interoperability suite. Windows
+- [x] Add Linux and macOS CI coverage for the interoperability suite. Windows
       remains a secondary compatibility signal.
 
 ### P2.3 Make identity boundaries explicit
 
-- [ ] Treat the MCP client credential as the identity of the calling client
+- [x] Treat the MCP client credential as the identity of the calling client
       principal, not as proof of a user-selected tenant or backend.
-- [ ] Derive tenant and principal exclusively from the authenticated Portico
+- [x] Derive tenant and principal exclusively from the authenticated Portico
       credential. Reject tenant, principal, connection, and origin overrides in
       MCP arguments or imported content.
-- [ ] Keep client authentication, upstream backend authentication, and future
+- [x] Keep client authentication, upstream backend authentication, and future
       delegated user authentication as separate contracts.
-- [ ] Include client, tenant, principal, connection, backend, catalog checksum,
+- [x] Include client, tenant, principal, connection, backend, catalog checksum,
       operation, and outcome in redacted audit events.
-- [ ] Confirm that sessions, caches, limits, telemetry, and inspector queries
+- [x] Confirm that sessions, caches, limits, telemetry, and inspector queries
       preserve the same isolation dimensions.
-- [ ] Document the current v1 static bearer-key model and mark OAuth/token
+- [x] Document the current v1 static bearer-key model and mark OAuth/token
       exchange as a later extension point rather than implying it is implemented.
 
 ### Priority 2 acceptance criteria

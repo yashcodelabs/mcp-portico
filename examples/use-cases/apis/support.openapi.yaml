@@ -1,0 +1,135 @@
+openapi: 3.0.3
+info:
+  title: Support Desk API
+  description: >-
+    Internal support-desk API for the support-agent use case. Operations are
+    compiled into an MCP Portico catalog; the catalog, not this document,
+    defines what an MCP client may call.
+  version: 1.2.0
+tags:
+  - name: tickets
+    description: Ticket operations
+  - name: customers
+    description: Customer profile operations
+paths:
+  /tickets:
+    get:
+      operationId: tickets.list
+      summary: List support tickets
+      description: Search tickets by status, optionally limited in count.
+      tags: [tickets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by ticket status.
+          schema:
+            type: string
+            enum: [open, pending, closed]
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of tickets to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Ticket list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+  /tickets/{ticketId}:
+    get:
+      operationId: tickets.get
+      summary: Get one support ticket
+      description: Returns a single ticket by id.
+      tags: [tickets]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          description: The ticket identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ticket details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '404':
+          description: Ticket not found.
+  /customers/{customerId}:
+    get:
+      operationId: customers.get
+      summary: Get a customer profile
+      description: Returns the profile for a customer.
+      tags: [customers]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: The customer identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Customer profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          description: Customer not found.
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token issued for the Support Desk API.
+  schemas:
+    Ticket:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Ticket identifier.
+        subject:
+          type: string
+          description: Ticket subject.
+        status:
+          type: string
+          enum: [open, pending, closed]
+        priority:
+          type: string
+        customerId:
+          type: string
+          description: Identifier of the requesting customer.
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Customer identifier.
+        name:
+          type: string
+          description: Customer name.
+        email:
+          type: string
+          format: email
+        plan:
+          type: string
+          description: Service plan name.

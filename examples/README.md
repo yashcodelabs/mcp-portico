@@ -5,6 +5,13 @@ import a public OpenAPI API into an inert catalog, validate a multi-tenant
 registry that pins it by checksum, create Portico API keys, serve the MCP
 endpoint, and drive a session over HTTP.
 
+The same MCP session flow applies to any MCP-compatible AI application -
+coding assistants, support agents, finance and operations agents, workflow
+agents, and custom MCP hosts. The [domain use cases](use-cases/README.md)
+demonstrate the fixed toolset and confirmation semantics on non-coding
+domains, with fixture catalogs and a clear split between generic MCP
+behavior and backend-specific catalog configuration.
+
 Files:
 
 - `apis/petstore.openapi.yaml` - a public OpenAPI 3.0 API (Petstore Lite):
@@ -23,10 +30,34 @@ Files:
 - `sample-registry.yaml` / `sample-registry.json` - the same registry in YAML
   and JSON: two tenants, two backends (petstore + billing), seven
   connections, and every upstream auth provider type.
+- `use-cases/` - credential-free domain examples (support, operations and
+  finance, workflow with confirmation) with OpenAPI fixtures, compiled
+  catalogs, and a registry pinned by checksum.
 
 The integration test `test/integration/examples.test.ts` executes the import,
 validation, serve, and MCP session steps of this walkthrough end-to-end
-against a loopback upstream.
+against a loopback upstream. `test/integration/use-cases.test.ts` does the
+same for the domain use cases.
+
+## Domain use cases
+
+The walkthrough below drives one MCP session against the Petstore Lite API.
+The flow is identical for every client domain; only catalog and registry
+configuration changes per backend.
+
+- [Support agent](use-cases/support-agent.md) - a service-desk agent searches
+  tickets and reads customer profiles through catalog-gated operations.
+- [Operations and finance](use-cases/operations-finance.md) - a finance agent
+  reads approved internal data without ever seeing a database or service URL.
+- [Workflow with confirmation](use-cases/workflow-confirmation.md) - a
+  workflow agent creates an invoice and confirms the mutation with a token.
+- [Weather-aware market brief](use-cases/weather-market/README.md) - an MCP
+  host joins live weather, crypto-market, and FX data into one dated research
+  brief.
+
+See [use-cases/README.md](use-cases/README.md) for the shared principles and
+the split between generic MCP behavior and backend-specific catalog
+configuration.
 
 ## 1. Prerequisites
 

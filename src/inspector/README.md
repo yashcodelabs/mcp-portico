@@ -1,7 +1,7 @@
 # Inspector
 
-Phase 7: a read-only, tenant-scoped operational view served by `mcp-portico
-serve` under `/inspector`.
+A read-only, tenant-scoped operational view served by `mcp-portico serve` under
+`/inspector`.
 
 ## Endpoints
 

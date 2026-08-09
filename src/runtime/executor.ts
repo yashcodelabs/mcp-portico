@@ -43,6 +43,7 @@ import {
   dispatchUpstream,
   encodeRequestBody,
   renderPath,
+  assertSameOrigin,
   type DispatchInit,
 } from './transports';
 import {
@@ -337,6 +338,11 @@ class OperationExecutorImpl implements OperationExecutor {
     startedAt: number,
   ): Promise<ExecuteOperationResult> {
     const url = new URL(renderPath(operation.path, validated.path), connection.baseUrl);
+    // Catalog artifacts are operator-controlled, but a malformed path (for
+    // example `//other.example/...` or a backslash escape) must never move a
+    // request off the connection's configured origin. This is the last
+    // defense before dispatch; redirects are separately policy-bound.
+    assertSameOrigin(url, connection.baseUrl, 'CONFIG_ERROR');
     url.search = buildQuery(validated.query);
 
     const headers = new Map<string, string>();
@@ -495,6 +501,7 @@ class OperationExecutorImpl implements OperationExecutor {
       newAuditEvent({
         tenantId: context.principal.tenantId,
         principalId: context.principal.id,
+        clientId: context.principal.clientId,
         connectionId: connection.id,
         backendId: connection.backendId,
         catalogChecksum: catalog.checksum,
@@ -529,6 +536,7 @@ class OperationExecutorImpl implements OperationExecutor {
       newAuditEvent({
         tenantId: context.principal.tenantId,
         principalId: context.principal.id,
+        clientId: context.principal.clientId,
         connectionId: connection.id,
         backendId: connection.backendId,
         catalogChecksum: catalog.checksum,

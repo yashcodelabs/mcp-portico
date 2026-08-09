@@ -1,3 +1,17 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const packageManifest = JSON.parse(
+  readFileSync(join(__dirname, '../../package.json'), 'utf8'),
+) as { version?: unknown };
+
+if (
+  typeof packageManifest.version !== 'string' ||
+  packageManifest.version.length === 0
+) {
+  throw new Error('package.json must define a non-empty version');
+}
+
 /**
  * MCP Portico product identity.
  *
@@ -10,7 +24,7 @@ export const PRODUCT_NAME = 'MCP Portico';
 export const PACKAGE_NAME = 'mcp-portico';
 export const BIN_NAME = 'mcp-portico';
 export const SERVER_NAME = 'mcp-portico';
-export const PRODUCT_VERSION = '0.1.0';
+export const PRODUCT_VERSION = packageManifest.version;
 
 /** Environment variable prefix, e.g. MCP_PORTICO_BASE_URL. */
 export const ENV_PREFIX = 'MCP_PORTICO_';

@@ -13,5 +13,5 @@ schemas for one backend API.
 - `diff.ts` - catalog change classification
 - `load.ts` / `index.ts` - loading, validating, and indexing catalogs
 
-The OpenAPI/Swagger importers (Phase 4) produce the normalized API model that
-feeds `compileCatalog`.
+The OpenAPI/Swagger importers produce the normalized API model that feeds
+`compileCatalog`.

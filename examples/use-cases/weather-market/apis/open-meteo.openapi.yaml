@@ -1,0 +1,73 @@
+openapi: 3.0.3
+info:
+  title: Open-Meteo Forecast API
+  description: >-
+    Public weather forecast data used by the weather-market research use case.
+    The MCP client combines this response with independent market and FX data;
+    Portico only exposes the catalog-gated API operation.
+  version: 1.0.0
+tags:
+  - name: weather
+    description: Weather forecast operations
+paths:
+  /v1/forecast:
+    get:
+      operationId: weather.forecast
+      summary: Get a weather forecast
+      description: Return current conditions and a short forecast for coordinates.
+      tags: [weather]
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          description: Latitude in decimal degrees.
+          schema:
+            type: number
+            minimum: -90
+            maximum: 90
+        - name: longitude
+          in: query
+          required: true
+          description: Longitude in decimal degrees.
+          schema:
+            type: number
+            minimum: -180
+            maximum: 180
+        - name: current
+          in: query
+          required: false
+          description: Comma-separated current weather variables.
+          schema:
+            type: string
+            default: temperature_2m,precipitation,rain,wind_speed_10m
+        - name: daily
+          in: query
+          required: false
+          description: Comma-separated daily forecast variables.
+          schema:
+            type: string
+            default: temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max
+        - name: forecast_days
+          in: query
+          required: false
+          description: Number of forecast days.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 16
+            default: 3
+        - name: timezone
+          in: query
+          required: false
+          description: IANA timezone or auto for the coordinate.
+          schema:
+            type: string
+            default: auto
+      responses:
+        '200':
+          description: Weather conditions and forecast.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true

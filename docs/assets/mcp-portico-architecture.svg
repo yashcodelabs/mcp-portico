@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560" role="img" aria-labelledby="title desc">
-  <title id="title">MCP Portico connects AI agents to multiple backend servers</title>
-  <desc id="desc">Cursor AI, Codex, and other AI agents connect to MCP Portico, which connects to one or more authorized backend servers.</desc>
+  <title id="title">MCP Portico connects MCP-compatible AI applications to authorized backend systems</title>
+  <desc id="desc">MCP-compatible AI applications, including coding assistants, support agents, workflow agents, BI agents, voice agents, and custom applications, connect to MCP Portico, which connects to one or more authorized backend systems.</desc>
   <defs>
     <linearGradient id="porticoGradient" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#fff4cf"/>
@@ -15,20 +15,6 @@
     <marker id="arrowGreen" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth">
       <path d="M0,0 L8,4 L0,8 Z" fill="#2eaa68"/>
     </marker>
-    <!-- Self-contained agent marks: GitHub README rendering does not fetch remote image references. -->
-    <g id="cursorMark">
-      <path d="M3 2.5 20.5 12l-6.9 1.2 3.4 7.5-2.8 1.3-3.4-7.5-5.8 3.2L3 2.5Z" fill="currentColor"/>
-    </g>
-    <g id="openaiMark" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 3.6c2.5 0 4.3 2.7 3.1 5 2.8-1 5.8 1 5.8 3.9 0 2.8-3 4.9-5.8 3.8 1.2 2.3-.6 5.1-3.1 5.1s-4.3-2.8-3.1-5.1c-2.8 1.1-5.8-1-5.8-3.8 0-2.9 3-4.9 5.8-3.9-1.2-2.3.6-5 3.1-5Z"/>
-      <path d="m8.9 8.6 6.2 3.9-6.2 3.8M15.1 8.6v7.7"/>
-    </g>
-    <g id="anthropicMark" fill="currentColor">
-      <path d="m12 2.2 10.2 19.6h-4.1l-2.1-4.1H9.9l-2.1 4.1H3.7L12 2.2Zm0 7.7-1.9 4.3h4.1L12 9.9Z"/>
-    </g>
-    <g id="copilotMark" fill="currentColor">
-      <path d="M5.3 4.3c2 0 3.5.9 4.5 2.1.9-1.2 2.5-2.1 4.5-2.1 3.5 0 5.8 2.6 5.8 6.2v4.1c0 2.6-1.6 4.9-4.2 4.9-1.5 0-2.6-.7-3.5-1.9-.8 1.2-2 1.9-3.5 1.9-2.6 0-4.2-2.3-4.2-4.9v-4.1c0-3.6 1.3-6.2.6-6.2Zm1.9 3.2c-.8 0-1.5 1-1.5 2.5v4.6c0 1.4.7 2.2 1.8 2.2 1.2 0 1.8-1 1.8-2.4v-4.4c0-1.5-.8-2.5-2.1-2.5Zm9.6 0c-1.3 0-2.1 1-2.1 2.5v4.4c0 1.4.6 2.4 1.8 2.4 1.1 0 1.8-.8 1.8-2.2V10c0-1.5-.7-2.5-1.5-2.5Z"/>
-    </g>
     <style>
       .title { font: 700 25px Inter, Segoe UI, Arial, sans-serif; fill: #172033; }
       .subtitle { font: 400 15px Inter, Segoe UI, Arial, sans-serif; fill: #667085; }
@@ -40,68 +26,69 @@
   </defs>
 
   <rect width="1400" height="560" rx="28" fill="#f8fafc"/>
-  <text x="700" y="55" text-anchor="middle" class="title">One MCP front door for every backend</text>
-  <text x="700" y="82" text-anchor="middle" class="subtitle">AI agents discover and use policy-controlled APIs through MCP Portico</text>
+  <text x="700" y="55" text-anchor="middle" class="title">One MCP front door for every AI application</text>
+  <text x="700" y="82" text-anchor="middle" class="subtitle">MCP-compatible AI applications use policy-controlled APIs through MCP Portico</text>
 
-  <!-- Three primary blocks -->
-  <rect x="55" y="145" width="350" height="300" rx="22" fill="#eef4ff" stroke="#4f7cff" stroke-width="2" filter="url(#shadow)"/>
-  <rect x="525" y="125" width="350" height="340" rx="22" fill="url(#porticoGradient)" stroke="#d99a00" stroke-width="3" filter="url(#shadow)"/>
-  <rect x="995" y="145" width="350" height="300" rx="22" fill="#edf9f2" stroke="#2eaa68" stroke-width="2" filter="url(#shadow)"/>
-
-  <!-- AI agents block -->
+  <!-- AI applications block -->
+  <rect x="55" y="145" width="380" height="330" rx="22" fill="#eef4ff" stroke="#4f7cff" stroke-width="2" filter="url(#shadow)"/>
   <circle cx="105" cy="195" r="22" fill="#4f7cff"/>
-  <g transform="translate(94 184) scale(1.15)" color="#ffffff"><use href="#cursorMark"/></g>
-  <text x="140" y="203" class="cardTitle">AI Agents</text>
-  <text x="80" y="248" class="cardText">Tools such as:</text>
-  <rect x="80" y="270" width="130" height="38" rx="19" fill="#ffffff" stroke="#c9d7ff"/>
-  <g transform="translate(91 279) scale(.83)" color="#4f7cff"><use href="#cursorMark"/></g>
-  <text x="158" y="294" text-anchor="middle" class="pill">Cursor AI</text>
-  <rect x="224" y="270" width="92" height="38" rx="19" fill="#ffffff" stroke="#c9d7ff"/>
-  <g transform="translate(233 279) scale(.83)" color="#172033"><use href="#openaiMark"/></g>
-  <text x="281" y="294" text-anchor="middle" class="pill">Codex</text>
-  <rect x="80" y="322" width="130" height="38" rx="19" fill="#ffffff" stroke="#c9d7ff"/>
-  <g transform="translate(91 331) scale(.83)" color="#d97757"><use href="#anthropicMark"/></g>
-  <text x="158" y="346" text-anchor="middle" class="pill">Claude</text>
-  <rect x="224" y="322" width="92" height="38" rx="19" fill="#ffffff" stroke="#c9d7ff"/>
-  <g transform="translate(233 331) scale(.83)" color="#172033"><use href="#copilotMark"/></g>
-  <text x="281" y="346" text-anchor="middle" class="pill">Copilot</text>
-  <text x="80" y="401" class="small">Connect through MCP</text>
+  <path d="M105 173 C107 184 113 189 124 191 C113 193 107 198 105 209 C103 198 97 193 86 191 C97 189 103 184 105 173 Z" fill="#ffffff"/>
+  <text x="150" y="201" class="cardTitle">AI Applications</text>
+  <text x="80" y="246" class="cardText">Any MCP-compatible AI application,</text>
+  <text x="80" y="268" class="cardText">regardless of model or vendor</text>
+  <text x="80" y="298" class="small">Clients include:</text>
+  <rect x="80" y="314" width="150" height="34" rx="17" fill="#ffffff" stroke="#c9d7ff"/>
+  <text x="155" y="336" text-anchor="middle" class="pill">Coding assistants</text>
+  <rect x="250" y="314" width="140" height="34" rx="17" fill="#ffffff" stroke="#c9d7ff"/>
+  <text x="320" y="336" text-anchor="middle" class="pill">Support agents</text>
+  <rect x="80" y="358" width="150" height="34" rx="17" fill="#ffffff" stroke="#c9d7ff"/>
+  <text x="155" y="380" text-anchor="middle" class="pill">Workflow agents</text>
+  <rect x="250" y="358" width="90" height="34" rx="17" fill="#ffffff" stroke="#c9d7ff"/>
+  <text x="295" y="380" text-anchor="middle" class="pill">BI agents</text>
+  <rect x="80" y="402" width="120" height="34" rx="17" fill="#ffffff" stroke="#c9d7ff"/>
+  <text x="140" y="424" text-anchor="middle" class="pill">Voice agents</text>
+  <rect x="250" y="402" width="110" height="34" rx="17" fill="#ffffff" stroke="#c9d7ff"/>
+  <text x="305" y="424" text-anchor="middle" class="pill">Custom apps</text>
+  <text x="80" y="455" class="small">Connect over MCP</text>
 
   <!-- MCP Portico block -->
+  <rect x="525" y="125" width="350" height="350" rx="22" fill="url(#porticoGradient)" stroke="#d99a00" stroke-width="3" filter="url(#shadow)"/>
   <circle cx="575" cy="185" r="25" fill="#172033"/>
   <path d="M563 193 L563 178 L569 172 L581 172 L587 178 L587 193 M569 193 L569 181 L581 181 L581 193" fill="none" stroke="#ffffff" stroke-width="3"/>
   <text x="620" y="193" class="cardTitle">MCP Portico</text>
-  <text x="700" y="237" text-anchor="middle" class="cardText">The MCP middleman</text>
+  <text x="700" y="237" text-anchor="middle" class="cardText">The security and policy boundary</text>
   <rect x="580" y="270" width="240" height="42" rx="21" fill="#ffffff" fill-opacity="0.72"/>
   <text x="700" y="297" text-anchor="middle" class="pill">Catalog-controlled access</text>
   <rect x="580" y="325" width="240" height="42" rx="21" fill="#ffffff" fill-opacity="0.72"/>
   <text x="700" y="352" text-anchor="middle" class="pill">Tenant and auth isolation</text>
   <rect x="580" y="380" width="240" height="42" rx="21" fill="#ffffff" fill-opacity="0.72"/>
   <text x="700" y="407" text-anchor="middle" class="pill">One deployment, many APIs</text>
+  <text x="700" y="452" text-anchor="middle" class="small">No model, vendor, or UI dependency</text>
 
-  <!-- Backend block -->
+  <!-- Backend systems block -->
+  <rect x="995" y="145" width="350" height="330" rx="22" fill="#edf9f2" stroke="#2eaa68" stroke-width="2" filter="url(#shadow)"/>
   <circle cx="1045" cy="195" r="22" fill="#2eaa68"/>
   <path d="M1034 188 L1056 188 L1056 202 L1034 202 Z M1034 180 L1056 180 L1056 185 L1034 185 Z M1034 205 L1056 205 L1056 210 L1034 210 Z" fill="#ffffff"/>
-  <text x="1080" y="203" class="cardTitle">Backend Servers</text>
-  <text x="1025" y="248" class="cardText">Any authorized HTTP API:</text>
+  <text x="1080" y="203" class="cardTitle">Backend Systems</text>
+  <text x="1025" y="248" class="cardText">Any approved HTTP API:</text>
   <rect x="1025" y="270" width="108" height="38" rx="19" fill="#ffffff" stroke="#bde8cf"/>
   <text x="1079" y="294" text-anchor="middle" class="pill">API 1</text>
   <rect x="1147" y="270" width="108" height="38" rx="19" fill="#ffffff" stroke="#bde8cf"/>
   <text x="1201" y="294" text-anchor="middle" class="pill">API 2</text>
   <rect x="1025" y="322" width="178" height="38" rx="19" fill="#ffffff" stroke="#bde8cf"/>
   <text x="1114" y="346" text-anchor="middle" class="pill">... API N</text>
-  <text x="1025" y="401" class="small">Connect through HTTPS</text>
+  <text x="1025" y="455" class="small">Connect through HTTPS</text>
 
   <!-- Connections -->
-  <line x1="406" y1="295" x2="515" y2="295" stroke="#4f7cff" stroke-width="4" marker-end="url(#arrowBlue)"/>
-  <line x1="515" y1="345" x2="406" y2="345" stroke="#4f7cff" stroke-width="4" marker-end="url(#arrowBlue)"/>
-  <text x="460" y="278" text-anchor="middle" class="small">MCP</text>
-  <text x="460" y="370" text-anchor="middle" class="small">responses</text>
+  <line x1="440" y1="295" x2="515" y2="295" stroke="#4f7cff" stroke-width="4" marker-end="url(#arrowBlue)"/>
+  <line x1="515" y1="345" x2="440" y2="345" stroke="#4f7cff" stroke-width="4" marker-end="url(#arrowBlue)"/>
+  <text x="478" y="278" text-anchor="middle" class="small">MCP</text>
+  <text x="478" y="370" text-anchor="middle" class="small">responses</text>
 
   <line x1="885" y1="295" x2="985" y2="295" stroke="#2eaa68" stroke-width="4" marker-end="url(#arrowGreen)"/>
   <line x1="985" y1="345" x2="885" y2="345" stroke="#2eaa68" stroke-width="4" marker-end="url(#arrowGreen)"/>
   <text x="935" y="278" text-anchor="middle" class="small">authorized calls</text>
   <text x="935" y="370" text-anchor="middle" class="small">API responses</text>
 
-  <text x="700" y="515" text-anchor="middle" class="subtitle">Agents never connect directly to unregistered backend origins</text>
+  <text x="700" y="515" text-anchor="middle" class="subtitle">AI applications never connect directly to unregistered backend origins</text>
 </svg>

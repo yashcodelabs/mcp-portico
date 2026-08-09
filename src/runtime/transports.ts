@@ -7,7 +7,7 @@ import {
 } from '../security/network';
 import { redactUrlQuerySecrets } from '../security/headers';
 import { isRedirectStatus, resolveRedirectTarget } from '../security/redirects';
-import { PorticoError } from '../shared/errors';
+import { PorticoError, type PorticoErrorCode } from '../shared/errors';
 
 /**
  * Upstream request rendering and dispatch (Phase 5).
@@ -58,6 +58,51 @@ export interface MultipartPart {
 }
 
 const MAX_REDIRECTS = 5;
+
+/**
+ * Reject any URL that resolves outside the connection's origin.
+ *
+ * Catalog paths always render under the connection base URL and path
+ * parameter values are percent-encoded, so an origin escape can only come
+ * from a malformed or hostile catalog artifact (for example a path like
+ * `//other.example/` or a leading-backslash trick). This assertion is the
+ * final boundary: request and probe targets must stay on the origin the
+ * operator configured for the connection.
+ */
+export function assertSameOrigin(
+  url: URL,
+  baseUrl: string | URL,
+  errorCode: PorticoErrorCode = 'CONFIG_ERROR',
+): void {
+  const base = typeof baseUrl === 'string' ? new URL(baseUrl) : baseUrl;
+  if (url.origin !== base.origin) {
+    throw new PorticoError(
+      errorCode,
+      `Refusing a request target outside the connection origin ("${url.origin}").`,
+      { details: { origin: url.origin } },
+    );
+  }
+}
+
+/**
+ * Resolve a probe path against the connection base URL, refusing any path
+ * that would change the connection origin (absolute URLs, protocol-relative
+ * paths, backslash escapes, or a different port).
+ */
+export function resolveProbeTarget(baseUrl: string, path: string | undefined): URL {
+  const base = new URL(baseUrl);
+  let target: URL;
+  try {
+    target = new URL(path ?? '/', base);
+  } catch {
+    throw new PorticoError(
+      'USAGE',
+      'Connection test path must be a valid relative path.',
+    );
+  }
+  assertSameOrigin(target, base, 'USAGE');
+  return target;
+}
 
 /** Replace `{name}` placeholders with percent-encoded path values. */
 export function renderPath(

@@ -1,0 +1,49 @@
+version: 1
+
+tenants:
+  - id: acme
+    name: Acme
+
+principals:
+  - id: acme-support-agent
+    tenantId: acme
+    allowedConnectionIds:
+      - acme-support
+  - id: acme-finance-agent
+    tenantId: acme
+    allowedConnectionIds:
+      - acme-finance
+
+backends:
+  - id: support
+    title: Support Desk API
+    scope: global
+    catalogRef: ./apis/support.catalog.json
+    catalogChecksum: sha256:111804285beb3512700955ed26b1e87c42e8f72cecf778c212be68ada5fc38a7
+  - id: finance
+    title: Finance API
+    scope: global
+    catalogRef: ./apis/finance.catalog.json
+    catalogChecksum: sha256:ddce57a6b47d0d5b31572e8d0dafbba1c50f1b51dd23a49c299ea538c033e502
+
+connections:
+  - id: acme-support
+    tenantId: acme
+    backendId: support
+    baseUrl: https://support.internal.example.com
+    network:
+      allowedProtocols: [https]
+    auth:
+      type: bearer
+      tokenRef: env:SUPPORT_PROD_TOKEN
+  - id: acme-finance
+    tenantId: acme
+    backendId: finance
+    baseUrl: https://finance.internal.example.com
+    network:
+      allowedProtocols: [https]
+    auth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      valueRef: env:FINANCE_PROD_API_KEY

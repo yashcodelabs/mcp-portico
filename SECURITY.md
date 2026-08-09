@@ -6,7 +6,12 @@ MCP Portico is a security-sensitive project because it will proxy tenant
 credentials and enforce catalog-gated access to upstream APIs. If you find a
 vulnerability, please do **not** open a public issue.
 
-Report privately to the maintainers. Include:
+Use GitHub's private security-advisory reporting flow:
+
+<https://github.com/yashcodelabs/mcp-portico/security/advisories>
+
+Select **Report a vulnerability** when private vulnerability reporting is
+enabled for the repository. Do not open a public issue. Include:
 
 - The affected version and platform
 - Steps to reproduce
@@ -15,6 +20,16 @@ Report privately to the maintainers. Include:
 
 We will acknowledge the report, work with you on a fix, and coordinate
 disclosure.
+
+## Supported versions
+
+| Version | Supported |
+| ------- | --------- |
+| 0.1.x   | Yes       |
+
+The maintainers target an acknowledgement within five business days. The
+timeline may vary when the report requires coordination with an upstream
+dependency or affected users.
 
 ## Security expectations for contributors
 

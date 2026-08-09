@@ -1,0 +1,48 @@
+{
+  "reportVersion": "1.0",
+  "sourceType": "openapi",
+  "confidence": 1,
+  "source": {
+    "file": "examples/use-cases/weather-market/apis/coingecko.openapi.yaml",
+    "format": "yaml",
+    "spec": {
+      "kind": "openapi3",
+      "version": "3.0.3"
+    },
+    "sourceChecksum": "sha256:38853e021e7d30aeae743e161e8dd4d4d653543ce82fde6760796eca4f97b5ce",
+    "bytes": 1690
+  },
+  "api": {
+    "id": "crypto-market",
+    "title": "CoinGecko Simple Price API",
+    "version": "1.0.0"
+  },
+  "summary": {
+    "operations": 1,
+    "methods": {
+      "GET": 1
+    },
+    "tags": 1,
+    "securitySchemes": 0,
+    "contentTypes": {
+      "request": [],
+      "response": ["application/json"]
+    }
+  },
+  "hints": {
+    "servers": [],
+    "schemes": []
+  },
+  "unsupported": [],
+  "warnings": [
+    {
+      "code": "INFERRED_RISK",
+      "message": "operation market.simple_price risk inferred as \"read\" from method GET"
+    }
+  ],
+  "catalog": {
+    "checksum": "sha256:086765d0821344ceb936e1ca92966b999d97f272258cce738dc59e82e5366bd8",
+    "operations": 1,
+    "available": 1
+  }
+}

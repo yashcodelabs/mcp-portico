@@ -1,0 +1,48 @@
+{
+  "reportVersion": "1.0",
+  "sourceType": "openapi",
+  "confidence": 1,
+  "source": {
+    "file": "examples/use-cases/weather-market/apis/frankfurter.openapi.yaml",
+    "format": "yaml",
+    "spec": {
+      "kind": "openapi3",
+      "version": "3.0.3"
+    },
+    "sourceChecksum": "sha256:4f768e0133a69eccb55ddcebf11d21f3c28e2f719434dee8054c3ee93147df7c",
+    "bytes": 1431
+  },
+  "api": {
+    "id": "fx",
+    "title": "Frankfurter Exchange Rates API",
+    "version": "1.0.0"
+  },
+  "summary": {
+    "operations": 1,
+    "methods": {
+      "GET": 1
+    },
+    "tags": 1,
+    "securitySchemes": 0,
+    "contentTypes": {
+      "request": [],
+      "response": ["application/json"]
+    }
+  },
+  "hints": {
+    "servers": [],
+    "schemes": []
+  },
+  "unsupported": [],
+  "warnings": [
+    {
+      "code": "INFERRED_RISK",
+      "message": "operation fx.latest risk inferred as \"read\" from method GET"
+    }
+  ],
+  "catalog": {
+    "checksum": "sha256:0523160ffb96a1f5004b86a44f4a8e1386d538f40d35c2e98dcdd6416743d286",
+    "operations": 1,
+    "available": 1
+  }
+}

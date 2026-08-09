@@ -34,8 +34,8 @@ This runs, in order:
 9. Package smoke test (tarball contents, dependency licenses, doc links, and
    installed CLI behavior)
 
-CI runs the same gate on Linux (Node 22 and 24), macOS (Node 22 and 24), and
-Windows (Node 22).
+CI runs the release gate on Linux (Node 22 and 24) and macOS (Node 22 and 24).
+Windows (Node 22) runs a reduced, non-blocking compatibility suite.
 
 ## Release checklist
 
@@ -59,12 +59,17 @@ compatibility signal. Before publishing a release:
 6. Confirm the published package contains only the intended files: the
    `files` allowlist in `package.json` plus `dist/`, `schemas/`, `examples/`,
    the user-facing `docs/` files (`registry.md`, `migration.md`,
-   `deprecation-inventory.md`), `CHANGELOG.md`, `CONTRIBUTING.md`,
-   `SECURITY.md`, `LICENSE`, and `README.md`. Dev-only documents
+   `deprecation-inventory.md`, and the MCP contract guides),
+   `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`,
+   `SUPPORT.md`, `LICENSE`, and `README.md`. Dev-only documents
    (`docs/mcp-portico-implementation-plan.md`, `docs/ai-analysis.md`,
    `docs/assets/`) are referenced from the README via GitHub URLs and are not
    shipped.
 7. Update `CHANGELOG.md` with the release notes before tagging.
+8. Create and push a `vX.Y.Z` Git tag after the release commit. The tag-based
+   `publish.yml` workflow publishes through npm trusted publishing; configure
+   the matching trusted publisher in the npm package settings before the first
+   release.
 
 ## Security rules
 
@@ -97,3 +102,6 @@ schemas/           Published JSON Schemas (Phase 2)
 examples/          Sample specs, overlays, registries, catalogs (later phases)
 test/fixtures/     Importer and runtime fixtures
 ```
+
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations and
+[SUPPORT.md](SUPPORT.md) for issue and support guidance.

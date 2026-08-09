@@ -1,10 +1,17 @@
 /**
  * Authentication contracts for MCP Portico.
  *
- * Two authentication layers exist and must never be confused:
+ * Three authentication layers exist and must never be confused:
  *
- * 1. Portico identity - proves which tenant/principal an MCP client belongs to.
- * 2. Upstream authentication - proves MCP Portico to a backend connection.
+ * 1. Portico client identity - the MCP client credential proves which
+ *    client, tenant, and principal a request belongs to. Tenant and
+ *    principal are derived exclusively from this authenticated result and
+ *    can never be supplied by the client.
+ * 2. Upstream authentication - proves MCP Portico to a backend connection;
+ *    credentials are operator-configured connection secrets, never the
+ *    client credential.
+ * 3. Future delegated user authentication - a later extension point; OAuth
+ *    token exchange is intentionally not implemented in v1.
  *
  * These interfaces are the Phase 1 seam. OAuth 2.1 can replace the static
  * bearer implementation later without changing MCP tool handlers.
@@ -17,6 +24,12 @@ export interface PorticoPrincipal {
   tenantId: string;
   /** Connection IDs the principal may select. */
   allowedConnectionIds: string[];
+  /**
+   * Identifier of the client credential that authenticated this principal
+   * (for example the static bearer key id). It is an audit/observability
+   * dimension only and is never the credential itself.
+   */
+  clientId?: string;
 }
 
 export interface PorticoAuthResult {

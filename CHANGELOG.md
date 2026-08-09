@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Added OSS community health files, public MCP contract documentation to the
+  npm package, and a tag-based trusted-publishing workflow.
+- Release packaging now cleans generated output, checks for stale compiled
+  files, and derives package assertions from the root manifest.
 - Packaging now builds a fresh `dist/` on pack: the `prepack` script runs the
   production build before `pnpm pack` / `npm publish`, so tarballs never
   contain stale build output.

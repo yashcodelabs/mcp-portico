@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   BIN_NAME,
@@ -13,13 +15,17 @@ import {
   headerName,
 } from '../../src/shared/brand';
 
+const packageManifest = JSON.parse(
+  readFileSync(join(__dirname, '../../package.json'), 'utf8'),
+) as { version: string };
+
 describe('brand identity', () => {
   it('uses the MCP Portico product identity', () => {
     expect(PRODUCT_NAME).toBe('MCP Portico');
     expect(PACKAGE_NAME).toBe('mcp-portico');
     expect(BIN_NAME).toBe('mcp-portico');
     expect(SERVER_NAME).toBe('mcp-portico');
-    expect(PRODUCT_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(PRODUCT_VERSION).toBe(packageManifest.version);
   });
 
   it('uses the MCP_PORTICO_ environment prefix', () => {

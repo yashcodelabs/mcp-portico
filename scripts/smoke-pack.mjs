@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT_PACKAGE = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const TMP = mkdtempSync(join(os.tmpdir(), 'portico-pack-'));
 
 const EXPECTED_PACKAGE_FILES = [
@@ -44,7 +45,9 @@ const EXPECTED_PACKAGE_FILES = [
   'README.md',
   'CHANGELOG.md',
   'CONTRIBUTING.md',
+  'CODE_OF_CONDUCT.md',
   'SECURITY.md',
+  'SUPPORT.md',
   'examples/README.md',
   'examples/apis/petstore.openapi.yaml',
   'examples/apis/petstore.catalog.json',
@@ -55,6 +58,9 @@ const EXPECTED_PACKAGE_FILES = [
   'docs/registry.md',
   'docs/migration.md',
   'docs/deprecation-inventory.md',
+  'docs/mcp-client-integration.md',
+  'docs/mcp-compatibility-contract.md',
+  'docs/mcp-interoperability-matrix.md',
 ];
 
 const FORBIDDEN_PACKAGE_PREFIXES = [
@@ -98,6 +104,20 @@ function listFiles(dir) {
     else files.push(fullPath);
   }
   return files;
+}
+
+function auditBuiltOutput() {
+  const distDir = join(ROOT, 'dist');
+  const sourceDir = join(ROOT, 'src');
+  if (!existsSync(distDir)) return;
+  for (const file of listFiles(distDir)) {
+    const relativeFile = relative(distDir, file).replace(/\\/g, '/');
+    if (!relativeFile.endsWith('.js')) continue;
+    const sourceFile = join(sourceDir, relativeFile.replace(/\.js$/, '.ts'));
+    if (!existsSync(sourceFile)) {
+      problems.push(`stale compiled file in dist: ${relativeFile}`);
+    }
+  }
 }
 
 function run(cmd, args, cwd, options = {}) {
@@ -202,6 +222,7 @@ try {
       : run('pnpm', ['pack', '--pack-destination', TMP], ROOT, {
           shell: process.platform === 'win32',
         });
+  auditBuiltOutput();
   const tarballName = /([^\s]+\.tgz)/.exec(packOutput)?.[1];
   if (tarballName === undefined) {
     problems.push(`could not determine packed tarball from output: ${packOutput}`);
@@ -218,9 +239,13 @@ try {
       problems.push('tarball does not contain a package root');
     } else {
       const pkg = JSON.parse(readFileSync(join(extractDir, 'package.json'), 'utf8'));
-      if (pkg.name !== 'mcp-portico') problems.push(`package name is "${pkg.name}"`);
-      if (pkg.version !== '0.1.0') problems.push(`package version is "${pkg.version}"`);
-      if (pkg.license !== 'Apache-2.0') {
+      if (pkg.name !== ROOT_PACKAGE.name) {
+        problems.push(`package name is "${pkg.name}"`);
+      }
+      if (pkg.version !== ROOT_PACKAGE.version) {
+        problems.push(`package version is "${pkg.version}"`);
+      }
+      if (pkg.license !== ROOT_PACKAGE.license) {
         problems.push(`package license is "${pkg.license}"`);
       }
 

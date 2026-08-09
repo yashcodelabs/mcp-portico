@@ -1,0 +1,48 @@
+{
+  "reportVersion": "1.0",
+  "sourceType": "openapi",
+  "confidence": 1,
+  "source": {
+    "file": "examples/use-cases/weather-market/apis/open-meteo.openapi.yaml",
+    "format": "yaml",
+    "spec": {
+      "kind": "openapi3",
+      "version": "3.0.3"
+    },
+    "sourceChecksum": "sha256:1e40590f3b43d0f90898994ab8894bc36ec1bb951698c7bf71fe4e3227ddaeb8",
+    "bytes": 2242
+  },
+  "api": {
+    "id": "weather",
+    "title": "Open-Meteo Forecast API",
+    "version": "1.0.0"
+  },
+  "summary": {
+    "operations": 1,
+    "methods": {
+      "GET": 1
+    },
+    "tags": 1,
+    "securitySchemes": 0,
+    "contentTypes": {
+      "request": [],
+      "response": ["application/json"]
+    }
+  },
+  "hints": {
+    "servers": [],
+    "schemes": []
+  },
+  "unsupported": [],
+  "warnings": [
+    {
+      "code": "INFERRED_RISK",
+      "message": "operation weather.forecast risk inferred as \"read\" from method GET"
+    }
+  ],
+  "catalog": {
+    "checksum": "sha256:d7956ea0867e16865d00ee0e666aef39d3623f701ce66321be89c5e323dc0c4d",
+    "operations": 1,
+    "available": 1
+  }
+}

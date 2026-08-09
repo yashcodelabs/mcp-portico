@@ -1,0 +1,255 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "support",
+    "title": "Support Desk API",
+    "version": "1.2.0"
+  },
+  "provenance": {
+    "sourceType": "openapi",
+    "sourceChecksum": "sha256:8a17d411e6063560658f36f4096bdc72f833aee5c74eaaea768a5d6a4e7158b6",
+    "generatedAt": "2026-08-09T07:13:36.381Z",
+    "compilerVersion": "0.1.0",
+    "confidence": 1,
+    "warnings": [
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation tickets.list risk inferred as \"read\" from method GET"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation tickets.get risk inferred as \"read\" from method GET"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation customers.get risk inferred as \"read\" from method GET"
+      }
+    ]
+  },
+  "checksum": "sha256:111804285beb3512700955ed26b1e87c42e8f72cecf778c212be68ada5fc38a7",
+  "securitySchemes": {
+    "bearerAuth": {
+      "type": "http",
+      "scheme": "bearer"
+    }
+  },
+  "operations": {
+    "tickets.list": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/tickets",
+      "summary": "List support tickets",
+      "description": "Search tickets by status, optionally limited in count.",
+      "tags": ["tickets"],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [["bearerAuth"]],
+      "request": {
+        "parameters": {
+          "query": [
+            {
+              "in": "query",
+              "name": "status",
+              "required": false,
+              "description": "Filter by ticket status.",
+              "schema": {
+                "type": "string",
+                "enum": ["open", "pending", "closed"]
+              }
+            },
+            {
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "description": "Maximum number of tickets to return.",
+              "schema": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 1,
+                "maximum": 100
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Ticket list.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/components_schemas_Ticket"
+            },
+            "$defs": {
+              "components_schemas_Ticket": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Ticket identifier."
+                  },
+                  "subject": {
+                    "type": "string",
+                    "description": "Ticket subject."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["open", "pending", "closed"]
+                  },
+                  "priority": {
+                    "type": "string"
+                  },
+                  "customerId": {
+                    "type": "string",
+                    "description": "Identifier of the requesting customer."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tickets.get": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/tickets/{ticketId}",
+      "summary": "Get one support ticket",
+      "description": "Returns a single ticket by id.",
+      "tags": ["tickets"],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [["bearerAuth"]],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "ticketId",
+              "required": true,
+              "description": "The ticket identifier.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Ticket details.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Ticket",
+            "$defs": {
+              "components_schemas_Ticket": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Ticket identifier."
+                  },
+                  "subject": {
+                    "type": "string",
+                    "description": "Ticket subject."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["open", "pending", "closed"]
+                  },
+                  "priority": {
+                    "type": "string"
+                  },
+                  "customerId": {
+                    "type": "string",
+                    "description": "Identifier of the requesting customer."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Ticket not found."
+        }
+      }
+    },
+    "customers.get": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/customers/{customerId}",
+      "summary": "Get a customer profile",
+      "description": "Returns the profile for a customer.",
+      "tags": ["customers"],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [["bearerAuth"]],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "customerId",
+              "required": true,
+              "description": "The customer identifier.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Customer profile.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Customer",
+            "$defs": {
+              "components_schemas_Customer": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Customer identifier."
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Customer name."
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "plan": {
+                    "type": "string",
+                    "description": "Service plan name."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Customer not found."
+        }
+      }
+    }
+  }
+}

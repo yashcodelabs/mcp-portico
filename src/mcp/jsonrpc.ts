@@ -86,7 +86,10 @@ export function parseJsonRpc(body: unknown): JsonRpcParseResult {
   if (typeof method !== 'string' || method === '') return invalid();
 
   const params = record.params;
-  if (params !== undefined && (typeof params !== 'object' || params === null)) {
+  if (
+    params !== undefined &&
+    (typeof params !== 'object' || params === null || Array.isArray(params))
+  ) {
     return invalid();
   }
 

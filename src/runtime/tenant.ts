@@ -15,6 +15,7 @@ import { PorticoError } from '../shared/errors';
 import { CacheStore } from './cache';
 import { CircuitBreakerStore } from './circuit';
 import { HealthStore } from './health';
+import { resolveProbeTarget } from './transports';
 import type {
   ExecuteContext,
   ExecuteOperationInput,
@@ -119,7 +120,11 @@ export class TenantRuntime {
       this.audit.record(
         newAuditEvent({
           tenantId: undefined,
+          // Best available attribution for a failed authentication: the
+          // credential's public key id. The principal is unknown until the
+          // credential verifies.
           principalId: parsed?.keyId,
+          clientId: parsed?.keyId,
           registryRevision: this.currentSnapshot.revision,
           action: 'authenticate',
           outcome: 'failure',
@@ -135,6 +140,7 @@ export class TenantRuntime {
       newAuditEvent({
         tenantId: result.principal.tenantId,
         principalId: result.principal.id,
+        clientId: result.principal.clientId,
         registryRevision: this.currentSnapshot.revision,
         action: 'authenticate',
         outcome: 'success',
@@ -164,6 +170,7 @@ export class TenantRuntime {
         newAuditEvent({
           tenantId: auth.principal.tenantId,
           principalId: auth.principal.id,
+          clientId: auth.principal.clientId,
           connectionId,
           registryRevision: this.currentSnapshot.revision,
           action: 'select_connection',
@@ -185,6 +192,7 @@ export class TenantRuntime {
       newAuditEvent({
         tenantId: auth.principal.tenantId,
         principalId: auth.principal.id,
+        clientId: auth.principal.clientId,
         connectionId: connection.id,
         backendId: connection.backendId,
         catalogChecksum: this.currentSnapshot.catalogForConnection(connection.id)
@@ -276,10 +284,11 @@ export class TenantRuntime {
     }
 
     const startedAt = Date.now();
+    const target = resolveProbeTarget(connection.baseUrl, options.path);
     let result: ProbeResult;
     try {
       result = await executeProbe({
-        url: new URL(options.path ?? '/', connection.baseUrl),
+        url: target,
         method: options.method,
         auth: connection.auth,
         staticHeaders: connection.staticHeaders,
@@ -299,6 +308,7 @@ export class TenantRuntime {
         newAuditEvent({
           tenantId: record.tenantId,
           principalId: principal.id,
+          clientId: principal.clientId,
           connectionId: connection.id,
           backendId: connection.backendId,
           catalogChecksum: this.currentSnapshot.catalogForConnection(connection.id)
@@ -331,6 +341,7 @@ export class TenantRuntime {
       newAuditEvent({
         tenantId: record.tenantId,
         principalId: principal.id,
+        clientId: principal.clientId,
         connectionId: connection.id,
         backendId: connection.backendId,
         catalogChecksum: this.currentSnapshot.catalogForConnection(connection.id)

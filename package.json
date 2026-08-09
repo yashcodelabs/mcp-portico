@@ -1,7 +1,7 @@
 {
   "name": "mcp-portico",
   "version": "0.1.0",
-  "description": "MCP Portico - a generic, multi-tenant MCP frontend for HTTP APIs",
+  "description": "MCP Portico - a client-neutral, multi-tenant MCP gateway for HTTP APIs",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -13,10 +13,14 @@
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "openapi",
+    "http-api",
     "catalog",
     "api-gateway",
-    "multi-tenant"
+    "multi-tenant",
+    "security",
+    "ai-agents"
   ],
   "bin": {
     "mcp-portico": "dist/cli/index.js"
@@ -28,9 +32,14 @@
     "docs/registry.md",
     "docs/migration.md",
     "docs/deprecation-inventory.md",
+    "docs/mcp-client-integration.md",
+    "docs/mcp-compatibility-contract.md",
+    "docs/mcp-interoperability-matrix.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
     "SECURITY.md",
+    "SUPPORT.md",
     "LICENSE",
     "README.md"
   ],
@@ -39,12 +48,12 @@
   },
   "packageManager": "pnpm@11.9.0",
   "publishConfig": {
-    "access": "public",
-    "provenance": false
+    "access": "public"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepack": "pnpm build",
+    "clean:dist": "node scripts/clean-dist.mjs",
+    "prepack": "pnpm clean:dist && pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",

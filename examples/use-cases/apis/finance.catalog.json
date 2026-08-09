@@ -1,0 +1,319 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "finance",
+    "title": "Finance API",
+    "version": "2.1.0"
+  },
+  "provenance": {
+    "sourceType": "openapi",
+    "sourceChecksum": "sha256:41a3028975b6c16c0e2e42a374c3b6d9ee74e61279fef9c9d4d2e690761bc306",
+    "generatedAt": "2026-08-09T07:13:37.077Z",
+    "compilerVersion": "0.1.0",
+    "confidence": 1,
+    "warnings": [
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation invoices.list risk inferred as \"read\" from method GET"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation invoices.post risk inferred as \"write\" from method POST"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation invoices.get risk inferred as \"read\" from method GET"
+      },
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation reports.run risk inferred as \"read\" from method GET"
+      }
+    ]
+  },
+  "checksum": "sha256:ddce57a6b47d0d5b31572e8d0dafbba1c50f1b51dd23a49c299ea538c033e502",
+  "securitySchemes": {
+    "apiKey": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-API-Key"
+    }
+  },
+  "operations": {
+    "invoices.list": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/invoices",
+      "summary": "List invoices",
+      "description": "Read-only listing of invoices, filtered by status.",
+      "tags": ["invoices"],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [["apiKey"]],
+      "request": {
+        "parameters": {
+          "query": [
+            {
+              "in": "query",
+              "name": "status",
+              "required": false,
+              "description": "Filter by invoice status.",
+              "schema": {
+                "type": "string",
+                "enum": ["open", "paid", "overdue"]
+              }
+            },
+            {
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "description": "Maximum number of invoices to return.",
+              "schema": {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 1,
+                "maximum": 100
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Invoice list.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/components_schemas_Invoice"
+            },
+            "$defs": {
+              "components_schemas_Invoice": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Invoice identifier."
+                  },
+                  "customerId": {
+                    "type": "string",
+                    "description": "Billed customer identifier."
+                  },
+                  "amount": {
+                    "type": "number",
+                    "description": "Invoice amount."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "ISO currency code."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["open", "paid", "overdue"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "invoices.post": {
+      "enabled": true,
+      "available": true,
+      "method": "POST",
+      "path": "/invoices",
+      "summary": "Create an invoice",
+      "description": "Creates an invoice; compiled as a write operation.",
+      "tags": ["invoices"],
+      "risk": "write",
+      "confirmation": "write",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [["apiKey"]],
+      "request": {
+        "body": {
+          "kind": "json",
+          "contentTypes": ["application/json"],
+          "required": true,
+          "schema": {
+            "$ref": "#/$defs/components_schemas_NewInvoice",
+            "$defs": {
+              "components_schemas_NewInvoice": {
+                "type": "object",
+                "required": ["amount", "currency"],
+                "properties": {
+                  "customerId": {
+                    "type": "string",
+                    "description": "Billed customer identifier."
+                  },
+                  "amount": {
+                    "type": "number",
+                    "description": "Invoice amount."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "ISO currency code."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "description": "The created invoice.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Invoice",
+            "$defs": {
+              "components_schemas_Invoice": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Invoice identifier."
+                  },
+                  "customerId": {
+                    "type": "string",
+                    "description": "Billed customer identifier."
+                  },
+                  "amount": {
+                    "type": "number",
+                    "description": "Invoice amount."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "ISO currency code."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["open", "paid", "overdue"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "invoices.get": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/invoices/{invoiceId}",
+      "summary": "Get one invoice",
+      "description": "Returns a single invoice by id.",
+      "tags": ["invoices"],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [["apiKey"]],
+      "request": {
+        "parameters": {
+          "path": [
+            {
+              "in": "path",
+              "name": "invoiceId",
+              "required": true,
+              "description": "The invoice identifier.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Invoice details.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_Invoice",
+            "$defs": {
+              "components_schemas_Invoice": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "Invoice identifier."
+                  },
+                  "customerId": {
+                    "type": "string",
+                    "description": "Billed customer identifier."
+                  },
+                  "amount": {
+                    "type": "number",
+                    "description": "Invoice amount."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "ISO currency code."
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["open", "paid", "overdue"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Invoice not found."
+        }
+      }
+    },
+    "reports.run": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/reports/usage",
+      "summary": "Run a usage report",
+      "description": "Read-only aggregated usage report.",
+      "tags": ["reports"],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [["apiKey"]],
+      "responses": {
+        "200": {
+          "description": "Report.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "$ref": "#/$defs/components_schemas_UsageReport",
+            "$defs": {
+              "components_schemas_UsageReport": {
+                "type": "object",
+                "properties": {
+                  "generatedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Report generation time."
+                  },
+                  "totals": {
+                    "type": "object",
+                    "description": "Aggregated totals."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

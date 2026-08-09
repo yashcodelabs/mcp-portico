@@ -7,13 +7,18 @@
  * reported with JSON-RPC error codes in the -320xx server range and the
  * matching Portico code in `error.data`.
  *
+ * Identity boundaries are server-owned: tenant, principal, and client
+ * identity come exclusively from the authenticated credential, and every
+ * tool call re-validates its arguments against the advertised input schema
+ * so tenant/principal/connection/origin override keys are rejected.
+ *
  * The transport is request/response only (no SSE), so the server never
  * pushes notifications: `capabilities` advertises exactly the surface that
  * works over the current JSON-RPC exchange. Resource payloads embed the
  * registry revision so clients can detect reloads and re-read metadata.
  */
 
-import type { PorticoPrincipal } from '../auth/types';
+import type { PorticoAuthResult, PorticoPrincipal } from '../auth/types';
 import type { TenantRuntime } from '../runtime/tenant';
 import { PRODUCT_VERSION } from '../shared/brand';
 import { summarizeAudit } from '../telemetry/summary';
@@ -29,6 +34,7 @@ import {
 } from './jsonrpc';
 import {
   ActiveSessionStore,
+  assertToolArgumentsValid,
   FIXED_TOOLS,
   toolErrorMessage,
   type ActiveSessionRegistry,
@@ -47,7 +53,13 @@ const SERVER_INFO = { name: 'mcp-portico', version: PRODUCT_VERSION };
 const USAGE_RESOURCE_URI = 'mcp-portico://usage';
 const APIS_RESOURCE_URI = 'mcp-portico://apis';
 
-type AuthOk = { kind: 'ok'; principal: PorticoPrincipal; runtime: TenantRuntime };
+type AuthOk = {
+  kind: 'ok';
+  principal: PorticoPrincipal;
+  runtime: TenantRuntime;
+  /** The full authenticated credential result for this request. */
+  auth: PorticoAuthResult;
+};
 
 type AuthResult =
   AuthOk | { kind: 'error'; status: number; response: JsonRpcErrorResponse };
@@ -214,8 +226,15 @@ export class McpServer {
       );
     }
 
-    const ctx: ToolContext = { runtime: auth.runtime, sessions: this.sessions };
+    const ctx: ToolContext = {
+      runtime: auth.runtime,
+      sessions: this.sessions,
+      auth: auth.auth,
+    };
     try {
+      // Server-side schema enforcement: identity/connection/origin override
+      // keys are rejected before any handler can observe them.
+      assertToolArgumentsValid(tool, args);
       const result = await tool.handler(auth.principal, args, ctx);
       return this.respond(200, success(id, result));
     } catch (error) {
@@ -252,7 +271,12 @@ export class McpServer {
     try {
       const auth = await this.runtime.authenticate(credential);
       this.revalidateActiveSession(auth.principal);
-      return { kind: 'ok', principal: auth.principal, runtime: this.runtime };
+      return {
+        kind: 'ok',
+        principal: auth.principal,
+        runtime: this.runtime,
+        auth,
+      };
     } catch {
       return this.authFailure(id);
     }

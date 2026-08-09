@@ -1,0 +1,156 @@
+openapi: 3.0.3
+info:
+  title: Finance API
+  description: >-
+    Internal finance API for the operations and finance use case. Operations
+    are compiled into an MCP Portico catalog; the catalog, not this document,
+    defines what an MCP client may call.
+  version: 2.1.0
+tags:
+  - name: invoices
+    description: Invoice operations
+  - name: reports
+    description: Report operations
+paths:
+  /invoices:
+    get:
+      operationId: invoices.list
+      summary: List invoices
+      description: Read-only listing of invoices, filtered by status.
+      tags: [invoices]
+      security:
+        - apiKey: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by invoice status.
+          schema:
+            type: string
+            enum: [open, paid, overdue]
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of invoices to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Invoice list.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invoice'
+    post:
+      operationId: invoices.post
+      summary: Create an invoice
+      description: Creates an invoice; compiled as a write operation.
+      tags: [invoices]
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewInvoice'
+      responses:
+        '201':
+          description: The created invoice.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+  /invoices/{invoiceId}:
+    get:
+      operationId: invoices.get
+      summary: Get one invoice
+      description: Returns a single invoice by id.
+      tags: [invoices]
+      security:
+        - apiKey: []
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          description: The invoice identifier.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Invoice details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '404':
+          description: Invoice not found.
+  /reports/usage:
+    get:
+      operationId: reports.run
+      summary: Run a usage report
+      description: Read-only aggregated usage report.
+      tags: [reports]
+      security:
+        - apiKey: []
+      responses:
+        '200':
+          description: Report.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageReport'
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key issued for the Finance API.
+  schemas:
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Invoice identifier.
+        customerId:
+          type: string
+          description: Billed customer identifier.
+        amount:
+          type: number
+          description: Invoice amount.
+        currency:
+          type: string
+          description: ISO currency code.
+        status:
+          type: string
+          enum: [open, paid, overdue]
+    NewInvoice:
+      type: object
+      required: [amount, currency]
+      properties:
+        customerId:
+          type: string
+          description: Billed customer identifier.
+        amount:
+          type: number
+          description: Invoice amount.
+        currency:
+          type: string
+          description: ISO currency code.
+    UsageReport:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+          description: Report generation time.
+        totals:
+          type: object
+          description: Aggregated totals.

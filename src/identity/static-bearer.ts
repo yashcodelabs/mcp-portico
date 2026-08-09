@@ -110,6 +110,7 @@ function toPorticoPrincipal(
   return {
     id: record.id,
     tenantId: record.tenantId,
+    clientId: record.keyId,
     allowedConnectionIds: record.allowedConnectionIds.filter(
       (connectionId) =>
         snapshot.authorizeConnection(record, connectionId) !== undefined,

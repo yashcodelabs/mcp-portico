@@ -1,0 +1,100 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "crypto-market",
+    "title": "CoinGecko Simple Price API",
+    "version": "1.0.0"
+  },
+  "provenance": {
+    "sourceType": "openapi",
+    "sourceChecksum": "sha256:38853e021e7d30aeae743e161e8dd4d4d653543ce82fde6760796eca4f97b5ce",
+    "generatedAt": "2026-08-09T18:26:29.702Z",
+    "compilerVersion": "0.1.0",
+    "confidence": 1,
+    "warnings": [
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation market.simple_price risk inferred as \"read\" from method GET"
+      }
+    ]
+  },
+  "checksum": "sha256:086765d0821344ceb936e1ca92966b999d97f272258cce738dc59e82e5366bd8",
+  "securitySchemes": {},
+  "operations": {
+    "market.simple_price": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/api/v3/simple/price",
+      "summary": "Get current crypto prices",
+      "description": "Return current prices and 24-hour changes for selected assets.",
+      "tags": ["market"],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [],
+      "request": {
+        "parameters": {
+          "query": [
+            {
+              "in": "query",
+              "name": "ids",
+              "required": true,
+              "description": "Comma-separated CoinGecko asset ids.",
+              "schema": {
+                "type": "string",
+                "default": "bitcoin,ethereum"
+              }
+            },
+            {
+              "in": "query",
+              "name": "vs_currencies",
+              "required": true,
+              "description": "Comma-separated quote currencies.",
+              "schema": {
+                "type": "string",
+                "default": "usd"
+              }
+            },
+            {
+              "in": "query",
+              "name": "include_24hr_change",
+              "required": false,
+              "description": "Include the 24-hour percentage change.",
+              "schema": {
+                "type": "boolean",
+                "default": true
+              }
+            },
+            {
+              "in": "query",
+              "name": "include_market_cap",
+              "required": false,
+              "description": "Include market capitalization in the quote currency.",
+              "schema": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Current prices keyed by asset id.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -4,11 +4,14 @@
  * Every tool is a named, schema-described handler bound to the authenticated
  * principal and a `ToolContext` exposing the tenant runtime plus a
  * server-side active-session registry keyed by principal id. Sessions are
- * created by `select_connection` and re-validated against the current
- * registry snapshot on every use.
+ * created by `select_connection` from the authenticated credential result
+ * and re-validated against the current registry snapshot on every use.
+ * Tool arguments are checked for identity and origin override keys before a
+ * handler runs. Unknown optional fields remain forward-compatible at the MCP
+ * boundary; catalog-governed operation arguments are validated separately.
  */
 
-import type { PorticoPrincipal } from '../auth/types';
+import type { PorticoAuthResult, PorticoPrincipal } from '../auth/types';
 import { CatalogIndex } from '../catalog/index';
 import type { CatalogOperation, RiskLevel } from '../catalog/types';
 import type {
@@ -60,6 +63,8 @@ export class ActiveSessionStore implements ActiveSessionRegistry {
 export interface ToolContext {
   runtime: TenantRuntime;
   sessions: ActiveSessionRegistry;
+  /** The authenticated Portico credential result for this request. */
+  auth?: PorticoAuthResult;
 }
 
 export interface McpTool {
@@ -109,6 +114,61 @@ function requiredString(args: Record<string, unknown>, name: string): string {
     throw new PorticoError('USAGE', `Missing required argument "${name}".`);
   }
   return value;
+}
+
+/**
+ * Reject identity and origin overrides without rejecting unknown optional MCP
+ * fields. The `arguments` object of `call_operation`/`call_operations` stays
+ * catalog-governed: only parameters the catalog models may be supplied, and
+ * they become upstream request data, never Portico identity.
+ */
+export function assertToolArgumentsValid(
+  tool: McpTool,
+  args: Record<string, unknown>,
+): void {
+  const modeled = new Set(
+    Object.keys((tool.inputSchema.properties ?? {}) as Record<string, unknown>),
+  );
+  const identityKeys = [
+    'tenantId',
+    'principalId',
+    'backendId',
+    'connectionId',
+    'origin',
+    'baseUrl',
+    'backendUrl',
+    'upstreamUrl',
+    'tenant',
+    'principal',
+    'backend',
+    'connection',
+    'userId',
+    'user',
+    'url',
+  ];
+  const override = identityKeys.find(
+    (key) => Object.prototype.hasOwnProperty.call(args, key) && !modeled.has(key),
+  );
+  const batchOverride =
+    tool.name === 'call_operations' && Array.isArray(args.operations)
+      ? args.operations
+          .filter(
+            (item): item is Record<string, unknown> =>
+              typeof item === 'object' && item !== null && !Array.isArray(item),
+          )
+          .flatMap((item) =>
+            identityKeys.filter((key) =>
+              Object.prototype.hasOwnProperty.call(item, key),
+            ),
+          )[0]
+      : undefined;
+  const rejected = override ?? batchOverride;
+  if (rejected !== undefined) {
+    throw new PorticoError(
+      'USAGE',
+      `Invalid arguments for tool "${tool.name}": identity override "${rejected}" is not allowed.`,
+    );
+  }
 }
 
 function requireSession(principal: PorticoPrincipal, ctx: ToolContext): SessionState {
@@ -173,10 +233,14 @@ async function handleSelectConnection(
   ctx: ToolContext,
 ): Promise<McpToolResult> {
   const connectionId = requiredString(args, 'connectionId');
-  const session = ctx.runtime.selectConnection(
-    { principal, authMethod: 'static-bearer' },
-    connectionId,
-  );
+  // The authenticated result carries the real client auth method; the
+  // fallback keeps direct handler callers working without a server
+  // authentication result.
+  const auth: PorticoAuthResult = ctx.auth ?? {
+    principal,
+    authMethod: 'static-bearer',
+  };
+  const session = ctx.runtime.selectConnection(auth, connectionId);
   ctx.sessions.set(principal.id, session);
   return textResult(JSON.stringify({ session: sessionView(session) }));
 }
