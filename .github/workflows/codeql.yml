@@ -32,4 +32,4 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
-      - uses: github/codeql-action/analyze@60168efe1c415ce0f5521ea06d5c2062adbeed1b # v3.28.17
+      - uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
