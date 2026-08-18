@@ -17,6 +17,27 @@ The local orders and inventory services are deterministic demo backends. They
 represent data that a public AI agent cannot access. Portico keeps their URLs,
 credentials, tenant, and principal policy behind the MCP boundary.
 
+## Five-minute evaluation
+
+From the repository root, install dependencies once and run the complete
+deterministic demo:
+
+```powershell
+pnpm install
+pnpm demo
+```
+
+This starts local weather, orders, and inventory APIs on temporary loopback
+ports, creates a temporary registry and bearer key, starts Portico, runs the
+joined MCP brief, and cleans up the registry, credentials, and servers before
+returning. It does not call Open-Meteo or any other external service. The
+output includes the exposed order count, affected order value, substitute
+inventory, and the joined insight that requires both public-style weather and
+private fulfillment data.
+
+The remaining sections are an expanded walkthrough for inspecting each piece
+of the example manually.
+
 ## 1. Build and validate the catalogs
 
 From the repository root:

@@ -26,6 +26,7 @@ import { startServer } from './serve';
 import { formatUsageSummary } from '../telemetry/format';
 import { loadAuditEvents } from '../telemetry/load';
 import { summarizeAudit } from '../telemetry/summary';
+import { runWeatherFulfillmentDemo } from '../demo/weather-fulfillment';
 
 function parsePort(value: string): number {
   const port = Number(value);
@@ -157,6 +158,25 @@ program
       }
     },
   );
+
+program
+  .command('demo')
+  .description(
+    'Run the five-minute weather-aware fulfillment demo with deterministic local backends',
+  )
+  .option(
+    '--max-orders <count>',
+    'maximum number of open orders to evaluate',
+    parsePositiveInt,
+    20,
+  )
+  .action(async (options: { maxOrders: number }) => {
+    try {
+      await runWeatherFulfillmentDemo({ maxOrders: options.maxOrders });
+    } catch (error) {
+      handleError(error);
+    }
+  });
 
 const registry = program.command('registry').description('Tenant registry management');
 

@@ -36,8 +36,12 @@ function assertHelp() {
     encoding: 'utf8',
   });
   if (help.status !== 0) fail(`--help exited ${help.status}: ${help.stderr}`);
-  if (!help.stdout.includes('mcp-portico') || !help.stdout.includes('serve')) {
-    fail(`--help output missing name or serve command:\n${help.stdout}`);
+  if (
+    !help.stdout.includes('mcp-portico') ||
+    !help.stdout.includes('serve') ||
+    !help.stdout.includes('demo')
+  ) {
+    fail(`--help output missing name, serve, or demo command:\n${help.stdout}`);
   }
   console.log('smoke: --help ok');
 }
@@ -53,6 +57,17 @@ function assertServeHelp() {
     }
   }
   console.log('smoke: serve --help ok');
+}
+
+function assertDemoHelp() {
+  const help = spawnSync(process.execPath, [CLI, 'demo', '--help'], {
+    encoding: 'utf8',
+  });
+  if (help.status !== 0) fail(`demo --help exited ${help.status}: ${help.stderr}`);
+  if (!help.stdout.includes('--max-orders')) {
+    fail(`demo --help missing --max-orders:\n${help.stdout}`);
+  }
+  console.log('smoke: demo --help ok');
 }
 
 function assertCatalog() {
@@ -516,6 +531,7 @@ async function assertServe() {
 
 assertHelp();
 assertServeHelp();
+assertDemoHelp();
 assertCatalog();
 assertImport();
 assertRegistry();

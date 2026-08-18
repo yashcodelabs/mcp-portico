@@ -121,6 +121,18 @@ For an end-to-end walkthrough, see the
 It joins a public weather API with deterministic private orders and inventory
 backends through the same MCP boundary an enterprise deployment would use.
 
+For a five-minute evaluation with no external services or manual setup, run:
+
+```bash
+pnpm install
+pnpm demo
+```
+
+The command creates temporary credentials and registry state, starts
+deterministic loopback weather, orders, and inventory APIs, runs the joined MCP
+brief, prints a human-readable risk summary, and removes everything before it
+exits.
+
 Maintainers can run `pnpm ci:check` for the complete release gate.
 
 ## Install from npm
@@ -148,6 +160,7 @@ repository's npm trusted-publishing workflow.
 
 ```text
 mcp-portico serve --registry <registry-file>      # implemented
+mcp-portico demo                                  # implemented
 mcp-portico catalog import <openapi-file> --api-id <id> --output <catalog> --report <report>   # implemented
 mcp-portico catalog import <ai-openapi> --api-id <id> --ai --overlay <overlay> --output <catalog> --report <report>   # implemented (AI-analysis artifacts)
 mcp-portico catalog validate <catalog-file>       # implemented
