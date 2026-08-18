@@ -141,7 +141,7 @@ export interface DemoOptions {
   output?: (line: string) => void;
   interactive?: boolean;
   ask?: (prompt: string) => Promise<string>;
-  connect?: 'cursor' | 'claude';
+  connect?: 'cursor' | 'claude' | 'codex';
 }
 
 interface RunningHttpServer {
@@ -621,7 +621,7 @@ const DEMO_QUESTIONS = [
   'What is the total order value exposed to weather disruption?',
   'Compare the weather risk and fulfillment alternatives for New York, Boston, and Chicago.',
   'Show the raw observations used for the risk assessment.',
-  'Connect Cursor or Claude Code to this live demo.',
+  'Connect Cursor, Claude Code, or Codex to this live demo.',
 ] as const;
 
 function answerQuestion(
@@ -671,7 +671,7 @@ async function runInteractiveQuestions(
   result: DemoResult,
   output: (line: string) => void,
   ask: (prompt: string) => Promise<string>,
-  connect: (client: 'cursor' | 'claude') => Promise<void>,
+  connect: (client: 'cursor' | 'claude' | 'codex') => Promise<void>,
 ): Promise<void> {
   output('');
   output('Ask a demo question (enter the number, or q to finish):');
@@ -693,11 +693,11 @@ async function runInteractiveQuestions(
     }
     if (questionNumber === 6) {
       output('');
-      const client = (await ask('Connect which client (cursor/claude)? '))
+      const client = (await ask('Connect which client (cursor/claude/codex)? '))
         .trim()
         .toLowerCase();
-      if (client !== 'cursor' && client !== 'claude') {
-        output('Please choose cursor or claude.');
+      if (client !== 'cursor' && client !== 'claude' && client !== 'codex') {
+        output('Please choose cursor, claude, or codex.');
         continue;
       }
       await connect(client);
@@ -711,12 +711,12 @@ async function runInteractiveQuestions(
 function printClientSetup(
   endpoint: string,
   token: string,
-  client: 'cursor' | 'claude',
+  client: 'cursor' | 'claude' | 'codex',
   output: (line: string) => void,
 ): void {
   output('');
   output(
-    `Connect ${client === 'cursor' ? 'Cursor' : 'Claude Code'} to the running demo:`,
+    `Connect ${client === 'cursor' ? 'Cursor' : client === 'claude' ? 'Claude Code' : 'Codex'} to the running demo:`,
   );
   output(`  MCP endpoint: ${endpoint}`);
   output('  Portico key:  ' + token);
@@ -737,7 +737,7 @@ function printClientSetup(
         2,
       ),
     );
-  } else {
+  } else if (client === 'claude') {
     output('Claude Code: run this command in another terminal:');
     output(
       `claude mcp add --transport http --header "Authorization: Bearer ${token}" mcp-portico-demo ${endpoint}`,
@@ -759,7 +759,22 @@ function printClientSetup(
         2,
       ),
     );
+  } else {
+    output(
+      'Codex: add this table to ~/.codex/config.toml or a trusted project .codex/config.toml:',
+    );
+    output('[mcp_servers.mcp_portico_demo]');
+    output(`url = "${endpoint}"`);
+    output(`http_headers = { Authorization = "Bearer ${token}" }`);
+    output('');
+    output('Then restart Codex or run /mcp to verify the connected tools.');
   }
+  output('');
+  output('Sample questions to try:');
+  output("  - Which open orders are at risk from tomorrow's weather?");
+  output('  - Which exposed orders have substitute inventory elsewhere?');
+  output('  - What is the total order value exposed to weather disruption?');
+  output('  - Compare New York, Boston, and Chicago.');
   output('');
   output('Keep this demo running while the AI client connects.');
 }
@@ -841,7 +856,9 @@ export async function runWeatherFulfillmentDemo(
         options.ask ??
         ((prompt: string): Promise<string> => terminal!.question(prompt));
       try {
-        const connect = async (client: 'cursor' | 'claude'): Promise<void> => {
+        const connect = async (
+          client: 'cursor' | 'claude' | 'codex',
+        ): Promise<void> => {
           printClientSetup(endpoint, registry.token, client, output);
           await ask('Press Enter here to stop the demo: ');
         };

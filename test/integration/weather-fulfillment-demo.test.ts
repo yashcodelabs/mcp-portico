@@ -90,4 +90,17 @@ describe('one-command weather fulfillment demo', () => {
     expect(output.join('\n')).toContain('"Authorization"');
     expect(output.join('\n')).toContain('Keep this demo running');
   }, 20_000);
+
+  it('prints Codex config and sample questions', async () => {
+    const output: string[] = [];
+    await runWeatherFulfillmentDemo({
+      connect: 'codex',
+      ask: async () => '',
+      output: (line) => output.push(line),
+    });
+
+    expect(output.join('\n')).toContain('[mcp_servers.mcp_portico_demo]');
+    expect(output.join('\n')).toContain('Sample questions to try:');
+    expect(output.join('\n')).toContain('Which open orders are at risk');
+  }, 20_000);
 });

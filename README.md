@@ -137,15 +137,24 @@ When run in a terminal, it also offers example questions to choose from. Use
 `mcp-portico demo --non-interactive` for a single pass in scripts or CI.
 
 To use the demo from an existing AI host, keep it running and print a
-ready-to-paste setup for Cursor or Claude Code:
+ready-to-paste setup for Cursor, Claude Code, or Codex:
 
 ```bash
 mcp-portico demo --connect cursor
 mcp-portico demo --connect claude
+mcp-portico demo --connect codex
 ```
 
 The server stays alive while the host connects, then removes its temporary
 registry, key, and local APIs when you press Enter to stop it.
+
+Sample questions to ask from any connected host:
+
+- Which open orders are at risk from tomorrow's weather?
+- Which exposed orders have substitute inventory elsewhere?
+- What is the total order value exposed to weather disruption?
+- Compare the weather risk and fulfillment alternatives for New York, Boston,
+  and Chicago.
 
 Maintainers can run `pnpm ci:check` for the complete release gate.
 

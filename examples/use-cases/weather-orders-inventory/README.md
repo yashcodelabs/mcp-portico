@@ -54,10 +54,34 @@ mcp-portico demo --connect claude
 ```
 
 The command prints the endpoint, bearer key, and a ready-to-paste Cursor
-`.cursor/mcp.json` entry or Claude Code `claude mcp add` command. Keep it
-running while the host connects. Ask the host questions such as “Which open
-orders are at risk from tomorrow's weather?” or “Which exposed orders have
-substitute inventory elsewhere?”
+`.cursor/mcp.json` entry, Claude Code `claude mcp add` command, or Codex
+`config.toml` table. Keep it running while the host connects. Ask the host
+questions such as “Which open orders are at risk from tomorrow's weather?” or
+“Which exposed orders have substitute inventory elsewhere?”
+
+### Sample interaction
+
+The following is illustrative; the exact wording may vary by host:
+
+```text
+$ mcp-portico demo --connect codex
+MCP endpoint: http://127.0.0.1:41723/mcp
+Portico key:  mpp_<temporary-key>
+
+Codex: add the printed MCP table, then ask:
+You: Which open orders are at risk from tomorrow's weather?
+
+Codex: I found 2 elevated-risk orders:
+       ORD-1001 in New York — 80% rain probability.
+       ORD-1003 in Chicago — 70% rain probability and 48 km/h wind.
+       Both have substitute inventory in another warehouse.
+
+You: What is the total order value exposed?
+Codex: $4,080 across 2 open orders.
+```
+
+The host is deciding which MCP tools to call; Portico still performs the
+authorized calls to the local weather, orders, and inventory APIs.
 
 The remaining sections are an expanded walkthrough for inspecting each piece
 of the example manually.

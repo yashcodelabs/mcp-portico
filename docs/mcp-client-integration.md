@@ -7,7 +7,7 @@
 This guide shows how to connect three kinds of clients to the same Portico
 deployment:
 
-1. a generic MCP host (including Cursor and Claude Code);
+1. a generic MCP host (including Cursor, Claude Code, and Codex);
 2. a remote host talking to a TLS-terminated deployment;
 3. a custom application speaking JSON-RPC directly.
 
@@ -99,6 +99,46 @@ For a checked-in project configuration, use `.mcp.json`:
 The demo prints both the `claude mcp add` command and the JSON form. Start it
 with `mcp-portico demo --connect claude`, copy the printed command in another
 terminal, and leave the demo process running while Claude Code connects.
+
+### Codex
+
+Codex supports Streamable HTTP MCP servers with bearer authentication. Add the
+printed table to `~/.codex/config.toml`, or to a trusted project-scoped
+`.codex/config.toml`:
+
+```toml
+[mcp_servers.mcp_portico_demo]
+url = "https://mcp.example.com/mcp"
+http_headers = { Authorization = "Bearer mpp_<keyId>_<secret>" }
+```
+
+The demo prints this block with its temporary values:
+
+```bash
+mcp-portico demo --connect codex
+```
+
+After adding it, restart Codex or use `/mcp` to verify the connected tools.
+
+## Sample host interaction
+
+Once Cursor, Claude Code, or Codex is connected, ask:
+
+```text
+You: Which open orders are at risk from tomorrow's weather?
+
+Host: I found 2 elevated-risk orders:
+      ORD-1001 in New York — 80% rain probability.
+      ORD-1003 in Chicago — 70% rain probability and 48 km/h wind.
+      Both have substitute inventory in another warehouse.
+
+You: What is the total order value exposed?
+
+Host: $4,080 across 2 open orders.
+```
+
+The host chooses and sequences MCP tools; Portico authenticates the host,
+selects the allowed tenant connection, and makes the upstream HTTP calls.
 
 Typical tool flow:
 

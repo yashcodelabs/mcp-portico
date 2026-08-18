@@ -91,9 +91,9 @@ function parsePositiveInt(value: string): number {
   return parsed;
 }
 
-function parseDemoClient(value: string): 'cursor' | 'claude' {
-  if (value !== 'cursor' && value !== 'claude') {
-    throw new InvalidArgumentError('expected "cursor" or "claude"');
+function parseDemoClient(value: string): 'cursor' | 'claude' | 'codex' {
+  if (value !== 'cursor' && value !== 'claude' && value !== 'codex') {
+    throw new InvalidArgumentError('expected "cursor", "claude", or "codex"');
   }
   return value;
 }
@@ -180,14 +180,14 @@ program
   .option('--non-interactive', 'run once and exit without the question menu')
   .option(
     '--connect <client>',
-    'keep the demo running and print setup for Cursor or Claude Code',
+    'keep the demo running and print setup for Cursor, Claude Code, or Codex',
     parseDemoClient,
   )
   .action(
     async (options: {
       maxOrders: number;
       nonInteractive?: boolean;
-      connect?: 'cursor' | 'claude';
+      connect?: 'cursor' | 'claude' | 'codex';
     }) => {
       try {
         await runWeatherFulfillmentDemo({
