@@ -141,7 +141,7 @@ export interface DemoOptions {
   output?: (line: string) => void;
   interactive?: boolean;
   ask?: (prompt: string) => Promise<string>;
-  agent?: (prompt: string) => Promise<string>;
+  connect?: 'cursor' | 'claude';
 }
 
 interface RunningHttpServer {
@@ -621,7 +621,7 @@ const DEMO_QUESTIONS = [
   'What is the total order value exposed to weather disruption?',
   'Compare the weather risk and fulfillment alternatives for New York, Boston, and Chicago.',
   'Show the raw observations used for the risk assessment.',
-  'Ask the AI agent a natural-language question.',
+  'Connect Cursor or Claude Code to this live demo.',
 ] as const;
 
 function answerQuestion(
@@ -671,7 +671,7 @@ async function runInteractiveQuestions(
   result: DemoResult,
   output: (line: string) => void,
   ask: (prompt: string) => Promise<string>,
-  agent: ((prompt: string) => Promise<string>) | undefined,
+  connect: (client: 'cursor' | 'claude') => Promise<void>,
 ): Promise<void> {
   output('');
   output('Ask a demo question (enter the number, or q to finish):');
@@ -692,173 +692,76 @@ async function runInteractiveQuestions(
       continue;
     }
     if (questionNumber === 6) {
-      if (agent === undefined) {
-        output('');
-        output(
-          'AI agent mode is not configured. To enable it, set OPENAI_API_KEY and choose this option again.',
-        );
-        output(
-          'The deterministic questions work without an API key or external network access.',
-        );
-      } else {
-        const prompt = (await ask('Ask the AI agent: ')).trim();
-        if (prompt !== '') {
-          output('');
-          output('AI agent answer:');
-          output(await agent(prompt));
-        }
+      output('');
+      const client = (await ask('Connect which client (cursor/claude)? '))
+        .trim()
+        .toLowerCase();
+      if (client !== 'cursor' && client !== 'claude') {
+        output('Please choose cursor or claude.');
+        continue;
       }
-    } else {
-      answerQuestion(result, questionNumber, output);
-    }
+      await connect(client);
+      return;
+    } else answerQuestion(result, questionNumber, output);
     output('');
     output('Choose another question, or q to finish.');
   }
 }
 
-interface OpenAiToolCall {
-  type: 'function_call';
-  name: string;
-  arguments: string;
-  call_id: string;
-}
-
-interface OpenAiResponse {
-  id?: string;
-  output?: unknown[];
-  output_text?: string;
-  error?: { message?: string };
-}
-
-function openAiFunctionTools(value: unknown): Array<Record<string, unknown>> {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((tool) => {
-    if (typeof tool !== 'object' || tool === null) return [];
-    const record = tool as Record<string, unknown>;
-    if (
-      typeof record.name !== 'string' ||
-      typeof record.description !== 'string' ||
-      typeof record.inputSchema !== 'object' ||
-      record.inputSchema === null
-    ) {
-      return [];
-    }
-    return [
-      {
-        type: 'function',
-        name: record.name,
-        description: record.description,
-        parameters: record.inputSchema,
-        strict: false,
-      },
-    ];
-  });
-}
-
-function responseFunctionCalls(response: OpenAiResponse): OpenAiToolCall[] {
-  return (response.output ?? []).filter(
-    (item): item is OpenAiToolCall =>
-      typeof item === 'object' &&
-      item !== null &&
-      (item as { type?: unknown }).type === 'function_call' &&
-      typeof (item as { name?: unknown }).name === 'string' &&
-      typeof (item as { arguments?: unknown }).arguments === 'string' &&
-      typeof (item as { call_id?: unknown }).call_id === 'string',
-  );
-}
-
-async function runOpenAiAgent(
+function printClientSetup(
   endpoint: string,
   token: string,
-  prompt: string,
-  apiKey: string,
-  model: string,
+  client: 'cursor' | 'claude',
   output: (line: string) => void,
-): Promise<string> {
-  const requestId = { value: 0 };
-  await mcpRequest(
-    endpoint,
-    token,
-    'initialize',
-    {
-      protocolVersion: '2025-06-18',
-      capabilities: {},
-      clientInfo: { name: 'weather-fulfillment-ai-agent', version: '0.1.0' },
-    },
-    ++requestId.value,
+): void {
+  output('');
+  output(
+    `Connect ${client === 'cursor' ? 'Cursor' : 'Claude Code'} to the running demo:`,
   );
-  await mcpRequest(endpoint, token, 'notifications/initialized', {}, undefined);
-  const listed = await mcpRequest(endpoint, token, 'tools/list', {}, ++requestId.value);
-  const listedResult = recordFromJson(listed?.result);
-  const tools = openAiFunctionTools(listedResult.tools);
-  if (tools.length === 0)
-    throw new Error('Portico returned no tools for the AI agent.');
-
-  const apiEndpoint =
-    process.env.MCP_PORTICO_AGENT_BASE_URL ?? 'https://api.openai.com/v1/responses';
-  const headers = {
-    authorization: `Bearer ${apiKey}`,
-    'content-type': 'application/json',
-  };
-  let responseId: string | undefined;
-  let input: unknown = [
-    {
-      role: 'user',
-      content: `You are an operations analyst. Use the Portico MCP tools to answer this question: ${prompt}`,
-    },
-  ];
-
-  for (let turn = 0; turn < 8; turn += 1) {
-    const response = await fetch(apiEndpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        model,
-        input,
-        ...(responseId === undefined ? {} : { previous_response_id: responseId }),
-        tools,
-        store: false,
-      }),
-    });
-    const body = (await response.json()) as OpenAiResponse;
-    if (!response.ok) {
-      throw new Error(
-        `AI agent HTTP ${response.status}: ${body.error?.message ?? 'request failed'}`,
-      );
-    }
-    responseId = body.id;
-    const calls = responseFunctionCalls(body);
-    if (calls.length === 0) {
-      if (typeof body.output_text === 'string' && body.output_text !== '')
-        return body.output_text;
-      throw new Error('AI agent returned no answer.');
-    }
-
-    const outputs: Array<Record<string, string>> = [];
-    for (const call of calls) {
-      let argumentsValue: Record<string, unknown>;
-      try {
-        argumentsValue = recordFromJson(JSON.parse(call.arguments));
-      } catch {
-        throw new Error(`AI agent produced invalid arguments for ${call.name}.`);
-      }
-      output(`  AI agent calls Portico tool: ${call.name}`);
-      const toolResult = await callTool(
-        endpoint,
-        token,
-        call.name,
-        argumentsValue,
-        requestId,
-      );
-      outputs.push({
-        type: 'function_call_output',
-        call_id: call.call_id,
-        output: JSON.stringify(toolResult),
-      });
-    }
-    input = outputs;
+  output(`  MCP endpoint: ${endpoint}`);
+  output('  Portico key:  ' + token);
+  output('');
+  if (client === 'cursor') {
+    output('Cursor: add this server to .cursor/mcp.json:');
+    output(
+      JSON.stringify(
+        {
+          mcpServers: {
+            'mcp-portico-demo': {
+              url: endpoint,
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
+    output('Claude Code: run this command in another terminal:');
+    output(
+      `claude mcp add --transport http --header "Authorization: Bearer ${token}" mcp-portico-demo ${endpoint}`,
+    );
+    output('');
+    output('Or add this entry to a project .mcp.json:');
+    output(
+      JSON.stringify(
+        {
+          mcpServers: {
+            'mcp-portico-demo': {
+              type: 'http',
+              url: endpoint,
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    );
   }
-  throw new Error('AI agent reached the maximum tool-call turns.');
+  output('');
+  output('Keep this demo running while the AI client connects.');
 }
 
 function setDemoEnvironment(): Map<string, string | undefined> {
@@ -896,6 +799,7 @@ export async function runWeatherFulfillmentDemo(
   const output = options.output ?? console.log;
   const maxOrders = options.maxOrders ?? 20;
   const interactive = options.interactive ?? false;
+  const hostMode = options.connect !== undefined;
 
   let backends: RunningBackends | undefined;
   let portico: RunningServer | undefined;
@@ -926,7 +830,7 @@ export async function runWeatherFulfillmentDemo(
     output('3. Running the joined MCP brief...');
     const result = await runBrief(endpoint, registry.token, maxOrders);
     printResult(result, output);
-    if (interactive) {
+    if (interactive || hostMode) {
       const terminal = options.ask
         ? undefined
         : createInterface({
@@ -937,21 +841,15 @@ export async function runWeatherFulfillmentDemo(
         options.ask ??
         ((prompt: string): Promise<string> => terminal!.question(prompt));
       try {
-        const apiKey = process.env.OPENAI_API_KEY;
-        const agent =
-          options.agent ??
-          (apiKey === undefined || apiKey === ''
-            ? undefined
-            : (prompt: string): Promise<string> =>
-                runOpenAiAgent(
-                  endpoint,
-                  registry.token,
-                  prompt,
-                  apiKey,
-                  process.env.MCP_PORTICO_AGENT_MODEL ?? 'gpt-5',
-                  output,
-                ));
-        await runInteractiveQuestions(result, output, ask, agent);
+        const connect = async (client: 'cursor' | 'claude'): Promise<void> => {
+          printClientSetup(endpoint, registry.token, client, output);
+          await ask('Press Enter here to stop the demo: ');
+        };
+        if (options.connect !== undefined) {
+          await connect(options.connect);
+        } else {
+          await runInteractiveQuestions(result, output, ask, connect);
+        }
       } finally {
         terminal?.close();
       }

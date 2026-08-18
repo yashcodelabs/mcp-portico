@@ -136,10 +136,16 @@ exits.
 When run in a terminal, it also offers example questions to choose from. Use
 `mcp-portico demo --non-interactive` for a single pass in scripts or CI.
 
-The menu also includes an optional AI-agent question. Set `OPENAI_API_KEY` to
-enable it; the agent uses the same live Portico MCP tools and defaults to the
-`gpt-5` model. Set `MCP_PORTICO_AGENT_MODEL` to choose another model. Without
-the key, the demo remains fully local and explains how to enable the option.
+To use the demo from an existing AI host, keep it running and print a
+ready-to-paste setup for Cursor or Claude Code:
+
+```bash
+mcp-portico demo --connect cursor
+mcp-portico demo --connect claude
+```
+
+The server stays alive while the host connects, then removes its temporary
+registry, key, and local APIs when you press Enter to stop it.
 
 Maintainers can run `pnpm ci:check` for the complete release gate.
 

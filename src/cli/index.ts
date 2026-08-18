@@ -91,6 +91,13 @@ function parsePositiveInt(value: string): number {
   return parsed;
 }
 
+function parseDemoClient(value: string): 'cursor' | 'claude' {
+  if (value !== 'cursor' && value !== 'claude') {
+    throw new InvalidArgumentError('expected "cursor" or "claude"');
+  }
+  return value;
+}
+
 function collect(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
@@ -171,16 +178,28 @@ program
     20,
   )
   .option('--non-interactive', 'run once and exit without the question menu')
-  .action(async (options: { maxOrders: number; nonInteractive?: boolean }) => {
-    try {
-      await runWeatherFulfillmentDemo({
-        maxOrders: options.maxOrders,
-        interactive: options.nonInteractive !== true && process.stdin.isTTY === true,
-      });
-    } catch (error) {
-      handleError(error);
-    }
-  });
+  .option(
+    '--connect <client>',
+    'keep the demo running and print setup for Cursor or Claude Code',
+    parseDemoClient,
+  )
+  .action(
+    async (options: {
+      maxOrders: number;
+      nonInteractive?: boolean;
+      connect?: 'cursor' | 'claude';
+    }) => {
+      try {
+        await runWeatherFulfillmentDemo({
+          maxOrders: options.maxOrders,
+          interactive: options.nonInteractive !== true && process.stdin.isTTY === true,
+          connect: options.connect,
+        });
+      } catch (error) {
+        handleError(error);
+      }
+    },
+  );
 
 const registry = program.command('registry').description('Tenant registry management');
 

@@ -64,7 +64,7 @@ function assertDemoHelp() {
     encoding: 'utf8',
   });
   if (help.status !== 0) fail(`demo --help exited ${help.status}: ${help.stderr}`);
-  for (const option of ['--max-orders', '--non-interactive']) {
+  for (const option of ['--max-orders', '--non-interactive', '--connect']) {
     if (!help.stdout.includes(option)) {
       fail(`demo --help missing ${option}:\n${help.stdout}`);
     }

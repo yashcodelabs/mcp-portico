@@ -7,7 +7,7 @@
 This guide shows how to connect three kinds of clients to the same Portico
 deployment:
 
-1. a generic MCP host (any MCP-compatible application);
+1. a generic MCP host (including Cursor and Claude Code);
 2. a remote host talking to a TLS-terminated deployment;
 3. a custom application speaking JSON-RPC directly.
 
@@ -48,6 +48,57 @@ The host normally performs `initialize` and
   `select_connection` (registry reloads or revocations invalidate sessions);
 - expect complete result sets: v1 does not paginate, so do not loop on
   cursors.
+
+### Cursor
+
+Create `.cursor/mcp.json` in the project that should use the tools:
+
+```json
+{
+  "mcpServers": {
+    "mcp-portico": {
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer mpp_<keyId>_<secret>"
+      }
+    }
+  }
+}
+```
+
+Cursor supports remote Streamable HTTP MCP servers and project-scoped
+`.cursor/mcp.json` configuration. The demo prints this exact block with its
+temporary endpoint and key.
+
+### Claude Code
+
+The shortest setup is:
+
+```bash
+claude mcp add --transport http \
+  --header "Authorization: Bearer mpp_<keyId>_<secret>" \
+  mcp-portico https://mcp.example.com/mcp
+```
+
+For a checked-in project configuration, use `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "mcp-portico": {
+      "type": "http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer mpp_<keyId>_<secret>"
+      }
+    }
+  }
+}
+```
+
+The demo prints both the `claude mcp add` command and the JSON form. Start it
+with `mcp-portico demo --connect claude`, copy the printed command in another
+terminal, and leave the demo process running while Claude Code connects.
 
 Typical tool flow:
 

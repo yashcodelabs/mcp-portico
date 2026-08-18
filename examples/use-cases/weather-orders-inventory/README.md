@@ -45,19 +45,19 @@ In an interactive terminal, choose follow-up questions such as:
 - Show the raw observations used for the risk assessment.
 
 Use `mcp-portico demo --non-interactive` when you want the summary without the
-question menu.
-
-To try the optional AI-agent question, set an OpenAI API key before starting
-the demo:
+question menu. To connect an existing AI coding host, use one of these in a
+separate terminal:
 
 ```powershell
-$env:OPENAI_API_KEY = 'your-api-key'
-pnpm demo
+mcp-portico demo --connect cursor
+mcp-portico demo --connect claude
 ```
 
-Choose option `6`, enter a natural-language question, and the agent will use
-the live Portico MCP tools before answering. The key is sent only to the model
-provider; backend credentials remain inside the temporary Portico setup.
+The command prints the endpoint, bearer key, and a ready-to-paste Cursor
+`.cursor/mcp.json` entry or Claude Code `claude mcp add` command. Keep it
+running while the host connects. Ask the host questions such as “Which open
+orders are at risk from tomorrow's weather?” or “Which exposed orders have
+substitute inventory elsewhere?”
 
 The remaining sections are an expanded walkthrough for inspecting each piece
 of the example manually.
