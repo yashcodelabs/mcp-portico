@@ -1,18 +1,28 @@
 # MCP Portico
 
-**A client-neutral MCP gateway for any MCP-compatible AI application.**
+**The MCP front door for your entire API estate.**
 
 [![CI](https://github.com/yashcodelabs/mcp-portico/actions/workflows/ci.yml/badge.svg)](https://github.com/yashcodelabs/mcp-portico/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)](package.json)
 
-MCP Portico connects MCP-compatible AI applications - coding assistants,
-support and service-desk agents, finance and operations agents, workflow and
-voice copilots, and custom MCP hosts - to approved internal APIs and backend
-systems. OpenAPI descriptions or inspected backend source code are compiled
-into policy-controlled catalogs, and one deployment can expose multiple
-backend systems while isolating tenants, credentials, catalogs, and runtime
-sessions.
+Bring REST/OpenAPI APIs, internally discovered APIs, and existing MCP servers
+together behind one governed MCP endpoint. Claude, Cursor, Codex, and custom
+agents connect once through MCP Portico while it handles discovery,
+authentication, policy, tenant isolation, routing, and audit.
+
+**No backend rewrite required. No per-client integration required.**
+
+```text
+REST / OpenAPI APIs ───────┐
+Backend-discovered APIs ──┼──> MCP Portico ──> Claude / Cursor / Codex
+Existing MCP servers ─────┘                         / custom agents
+```
+
+MCP Portico gives the APIs you already have an MCP interface. It turns an
+organization's existing backend estate into governed, discoverable tools for
+AI applications without requiring every backend team to build and maintain a
+separate MCP server.
 
 MCP Portico is not tied to a particular model, vendor, agent framework, or
 user-interface type: any application that speaks MCP can connect. It does
@@ -30,12 +40,51 @@ provider; it secures the boundary between them and your internal systems.
 tracks the evolution from a v1 HTTP API gateway to a client-neutral access
 layer for any MCP-compatible AI application.
 
+## The API-estate problem
+
+Most organizations have a mix of REST services, OpenAPI descriptions, legacy
+internal systems, and a growing number of MCP servers. Connecting each system
+to each AI client creates duplicated integrations, inconsistent policy, and
+credentials spread across clients.
+
+```text
+Without Portico:
+
+Orders API ───────> custom MCP integration ───────> AI client 1
+CRM API ──────────> custom MCP integration ───────> AI client 2
+Legacy service ───> custom MCP integration ───────> AI client 3
+```
+
+## The Portico approach
+
+Portico provides one MCP boundary for the entire API estate:
+
+```text
+OpenAPI / Swagger ───────┐
+Backend discovery ───────┼──> Catalog + policy ──> MCP Portico ──> Any MCP client
+Existing MCP servers ────┘             │
+                                       └── auth · tenants · routing · audit
+```
+
+This gives platform teams:
+
+- **One integration point** for Claude, Cursor, Codex, and custom agents.
+- **One policy boundary** for discovery, authorization, approvals, and audit.
+- **One catalog model** for APIs that already speak MCP and APIs that do not.
+- **Server-side credentials** so AI clients never receive unrestricted backend
+  access.
+
 ## Why MCP Portico
 
-- **Any MCP client, one gateway** - coding assistants, support agents,
-  workflow agents, BI agents, voice agents, and custom applications all
-  speak the same MCP protocol and use the same fixed toolset. No vendor,
-  model, or agent framework is required.
+- **One MCP front door, many backends** - expose REST/OpenAPI APIs,
+  self-discovered internal APIs, and native MCP servers through one consistent
+  MCP boundary.
+- **No backend rewrite required** - compile existing API descriptions or
+  inspected backend metadata into governed MCP tools.
+- **Any MCP client, one connection** - coding assistants, support agents,
+  workflow agents, BI agents, voice agents, and custom applications all speak
+  the same MCP protocol and use the same fixed toolset. No vendor, model, or
+  agent framework is required.
 - **The catalog is the gate** - operations are compiled from OpenAPI/Swagger
   or AI-analyzed backend metadata into a validated catalog. Only
   catalog-gated operations can run, keyed by stable operation ID.
@@ -49,9 +98,10 @@ layer for any MCP-compatible AI application.
 ## CTO view: one governed AI access layer
 
 MCP Portico is useful when a company wants many AI experiences to work with
-internal systems without building a separate security and integration layer
-for every product. Cursor, Claude Code, Codex, support agents, workflow
-copilots, and custom applications can all use the same Portico boundary.
+its existing API estate without building a separate security and integration
+layer for every product or backend. Cursor, Claude Code, Codex, support
+agents, workflow copilots, and custom applications can all use the same
+Portico boundary.
 
 ```text
 Many AI hosts
@@ -73,9 +123,24 @@ CRM · ERP · tickets · inventory · finance · observability · internal APIs
 | Security operations | Investigate alerts across IAM, SIEM, tickets, and assets       | Read-only defaults, sensitive-field controls, auditability  |
 | Procurement         | Compare vendors, purchase orders, and contract limits          | Confirmation before creating or changing commitments        |
 
+## CTO view: API-estate coverage
+
+The strategic value is not only MCP transport. Portico gives an organization a
+repeatable way to make its existing APIs available to AI without creating a
+new integration project for every client or backend.
+
+| Existing estate | Portico outcome | Operating benefit |
+| --- | --- | --- |
+| REST/OpenAPI services | Compiled MCP tools | No per-backend MCP rewrite |
+| Legacy or undocumented internal APIs | Backend-discovered catalog input | Bring more of the estate into the same control plane |
+| Existing MCP servers | Federated behind the same boundary | Preserve existing investments |
+| Claude, Cursor, Codex, and custom agents | One MCP connection | No per-client integration |
+| Sensitive enterprise systems | Tenant-aware, policy-controlled execution | Centralized security and audit |
+
 The weather-aware fulfillment example is deliberately small, but the pattern
 is enterprise-sized: the useful answer requires joining data from multiple
-systems that no single public API can provide.
+systems that no single public API can provide. The same model extends to CRM,
+ERP, finance, support, observability, procurement, and internal operations.
 
 ### What the connected-host experience looks like
 
@@ -137,6 +202,16 @@ flowchart LR
     REG --> RT
     RT --> MCP
     MCP --> UP["Authorized upstream APIs"]
+```
+
+The front-door flow can be summarized as:
+
+```mermaid
+flowchart LR
+    REST["REST / OpenAPI APIs"] --> PORTICO["MCP Portico\nCatalog · policy · auth · routing · audit"]
+    DISCOVERY["Backend discovery"] --> PORTICO
+    NATIVE["Existing MCP servers"] --> PORTICO
+    PORTICO --> CLIENTS["Claude · Cursor · Codex · custom agents"]
 ```
 
 ## Authentication at two layers
