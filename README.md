@@ -133,6 +133,9 @@ deterministic loopback weather, orders, and inventory APIs, runs the joined MCP
 brief, prints a human-readable risk summary, and removes everything before it
 exits.
 
+When run in a terminal, it also offers example questions to choose from. Use
+`mcp-portico demo --non-interactive` for a single pass in scripts or CI.
+
 Maintainers can run `pnpm ci:check` for the complete release gate.
 
 ## Install from npm

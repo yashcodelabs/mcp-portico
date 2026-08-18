@@ -62,4 +62,18 @@ describe('one-command weather fulfillment demo', () => {
       'Cleanup complete. Temporary setup and local services removed.',
     );
   });
+
+  it('answers selected questions without requiring an LLM', async () => {
+    const output: string[] = [];
+    const choices = ['1', '4', 'q'];
+    const result = await runWeatherFulfillmentDemo({
+      interactive: true,
+      ask: async () => choices.shift() ?? 'q',
+      output: (line) => output.push(line),
+    });
+
+    expect(result.summary.weatherExposedOrders).toBe(2);
+    expect(output.join('\n')).toContain('ORD-1001 (New York, NY)');
+    expect(output.join('\n')).toContain('Boston, MA: normal risk');
+  }, 20_000);
 });

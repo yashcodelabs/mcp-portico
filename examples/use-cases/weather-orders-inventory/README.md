@@ -35,6 +35,18 @@ output includes the exposed order count, affected order value, substitute
 inventory, and the joined insight that requires both public-style weather and
 private fulfillment data.
 
+In an interactive terminal, choose follow-up questions such as:
+
+- Which open orders are at risk from tomorrow's weather?
+- Which weather-exposed orders have enough substitute inventory elsewhere?
+- What is the total order value exposed to weather disruption?
+- Compare the weather risk and fulfillment alternatives for New York, Boston,
+  and Chicago.
+- Show the raw observations used for the risk assessment.
+
+Use `mcp-portico demo --non-interactive` when you want the summary without the
+question menu.
+
 The remaining sections are an expanded walkthrough for inspecting each piece
 of the example manually.
 

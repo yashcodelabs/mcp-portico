@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import { createInterface } from 'node:readline/promises';
 
 import { startServer, type RunningServer } from '../cli/serve';
 import { generatePorticoKey } from '../identity/keys';
@@ -138,6 +139,8 @@ export interface DemoResult {
 export interface DemoOptions {
   maxOrders?: number;
   output?: (line: string) => void;
+  interactive?: boolean;
+  ask?: (prompt: string) => Promise<string>;
 }
 
 interface RunningHttpServer {
@@ -611,6 +614,86 @@ function printResult(result: DemoResult, output: (line: string) => void): void {
   output(`Joined insight: ${result.joinedInsight}`);
 }
 
+const DEMO_QUESTIONS = [
+  "Which open orders are at risk from tomorrow's weather?",
+  'Which weather-exposed orders have enough substitute inventory elsewhere?',
+  'What is the total order value exposed to weather disruption?',
+  'Compare the weather risk and fulfillment alternatives for New York, Boston, and Chicago.',
+  'Show the raw observations used for the risk assessment.',
+] as const;
+
+function answerQuestion(
+  result: DemoResult,
+  questionNumber: number,
+  output: (line: string) => void,
+): void {
+  const atRisk = result.assessments.filter((item) => item.weatherRisk === 'elevated');
+  output('');
+  output('Answer:');
+  if (questionNumber === 1) {
+    for (const item of atRisk) {
+      output(
+        `  ${item.order.id} (${item.order.destination}) — ${item.reasons.join(' and ')}.`,
+      );
+    }
+  } else if (questionNumber === 2) {
+    for (const item of atRisk) {
+      const substitutes = item.substituteInventory
+        .map((record) => `${record.warehouseCity}: ${record.available} available`)
+        .join('; ');
+      output(`  ${item.order.id} (${item.order.sku}) — ${substitutes || 'none'}.`);
+    }
+  } else if (questionNumber === 3) {
+    output(`  ${formatMoney(result.summary.exposedOrderValueUsd)} is exposed.`);
+  } else if (questionNumber === 4) {
+    for (const item of result.assessments) {
+      output(
+        `  ${item.order.destination}: ${item.weatherRisk} risk; ` +
+          `${item.weather.nextDayRainProbability}% rain probability; ` +
+          `substitutes ${item.substituteInventory.length > 0 ? 'available' : 'not available'}.`,
+      );
+    }
+  } else if (questionNumber === 5) {
+    for (const item of result.assessments) {
+      output(
+        `  ${item.order.id}: temperature ${item.weather.temperature ?? 'unknown'}°C, ` +
+          `rain ${item.weather.rain ?? 'unknown'} mm, ` +
+          `wind ${item.weather.windSpeed ?? 'unknown'} km/h, ` +
+          `next-day rain ${item.weather.nextDayRainProbability}%.`,
+      );
+    }
+  }
+}
+
+async function runInteractiveQuestions(
+  result: DemoResult,
+  output: (line: string) => void,
+  ask: (prompt: string) => Promise<string>,
+): Promise<void> {
+  output('');
+  output('Ask a demo question (enter the number, or q to finish):');
+  DEMO_QUESTIONS.forEach((question, index) => output(`  ${index + 1}. ${question}`));
+  while (true) {
+    const answer = (await ask('Your choice: ')).trim().toLowerCase();
+    if (answer === 'q' || answer === 'quit' || answer === 'exit' || answer === '')
+      return;
+    const questionNumber = Number(answer);
+    if (
+      !Number.isInteger(questionNumber) ||
+      questionNumber < 1 ||
+      questionNumber > DEMO_QUESTIONS.length
+    ) {
+      output(
+        `Please enter a number from 1 to ${DEMO_QUESTIONS.length}, or q to finish.`,
+      );
+      continue;
+    }
+    answerQuestion(result, questionNumber, output);
+    output('');
+    output('Choose another question, or q to finish.');
+  }
+}
+
 function setDemoEnvironment(): Map<string, string | undefined> {
   const values = new Map<string, string | undefined>();
   const updates: Record<string, string> = {
@@ -645,6 +728,7 @@ export async function runWeatherFulfillmentDemo(
 ): Promise<DemoResult> {
   const output = options.output ?? console.log;
   const maxOrders = options.maxOrders ?? 20;
+  const interactive = options.interactive ?? false;
 
   let backends: RunningBackends | undefined;
   let portico: RunningServer | undefined;
@@ -675,6 +759,22 @@ export async function runWeatherFulfillmentDemo(
     output('3. Running the joined MCP brief...');
     const result = await runBrief(endpoint, registry.token, maxOrders);
     printResult(result, output);
+    if (interactive) {
+      const terminal = options.ask
+        ? undefined
+        : createInterface({
+            input: process.stdin,
+            output: process.stdout,
+          });
+      const ask =
+        options.ask ??
+        ((prompt: string): Promise<string> => terminal!.question(prompt));
+      try {
+        await runInteractiveQuestions(result, output, ask);
+      } finally {
+        terminal?.close();
+      }
+    }
     return result;
   } finally {
     if (portico !== undefined) await portico.close();

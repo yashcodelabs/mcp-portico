@@ -170,9 +170,13 @@ program
     parsePositiveInt,
     20,
   )
-  .action(async (options: { maxOrders: number }) => {
+  .option('--non-interactive', 'run once and exit without the question menu')
+  .action(async (options: { maxOrders: number; nonInteractive?: boolean }) => {
     try {
-      await runWeatherFulfillmentDemo({ maxOrders: options.maxOrders });
+      await runWeatherFulfillmentDemo({
+        maxOrders: options.maxOrders,
+        interactive: options.nonInteractive !== true && process.stdin.isTTY === true,
+      });
     } catch (error) {
       handleError(error);
     }

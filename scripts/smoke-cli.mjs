@@ -64,8 +64,10 @@ function assertDemoHelp() {
     encoding: 'utf8',
   });
   if (help.status !== 0) fail(`demo --help exited ${help.status}: ${help.stderr}`);
-  if (!help.stdout.includes('--max-orders')) {
-    fail(`demo --help missing --max-orders:\n${help.stdout}`);
+  for (const option of ['--max-orders', '--non-interactive']) {
+    if (!help.stdout.includes(option)) {
+      fail(`demo --help missing ${option}:\n${help.stdout}`);
+    }
   }
   console.log('smoke: demo --help ok');
 }
