@@ -13,12 +13,13 @@ OpenAPI documents with `mcp-portico catalog import` and exercised by
 
 ## Use cases
 
-| Use case                   | Document                                             | What it demonstrates                                                                       |
-| -------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Support agent              | [support-agent.md](support-agent.md)                 | Searching a ticketing API and reading a customer profile through catalog-gated operations. |
-| Operations and finance     | [operations-finance.md](operations-finance.md)       | Reading approved internal data when the application never sees a database or service URL.  |
-| Workflow with confirmation | [workflow-confirmation.md](workflow-confirmation.md) | Confirming a mutating operation with a token before the upstream call is made.             |
-| Weather-aware market brief | [weather-market/README.md](weather-market/README.md) | Joining live weather, crypto-market, and FX data into one cautious research brief.         |
+| Use case                       | Document                                                                 | What it demonstrates                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Support agent                  | [support-agent.md](support-agent.md)                                     | Searching a ticketing API and reading a customer profile through catalog-gated operations. |
+| Operations and finance         | [operations-finance.md](operations-finance.md)                           | Reading approved internal data when the application never sees a database or service URL.  |
+| Workflow with confirmation     | [workflow-confirmation.md](workflow-confirmation.md)                     | Confirming a mutating operation with a token before the upstream call is made.             |
+| Weather-aware fulfillment risk | [weather-orders-inventory/README.md](weather-orders-inventory/README.md) | Joining public weather with private orders and inventory to identify fulfillment risk.     |
+| Codex local multi-backend demo | [registry.codex-demo.yaml](registry.codex-demo.yaml)                     | Combining a public weather API with local finance and support APIs through Codex MCP.      |
 
 ## Generic MCP behavior
 

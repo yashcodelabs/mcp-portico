@@ -2,9 +2,7 @@ openapi: 3.0.3
 info:
   title: Open-Meteo Forecast API
   description: >-
-    Public weather forecast data used by the weather-market research use case.
-    The MCP client combines this response with independent market and FX data;
-    Portico only exposes the catalog-gated API operation.
+    Public weather forecast data used to assess delivery disruption risk.
   version: 1.0.0
 tags:
   - name: weather
@@ -46,7 +44,7 @@ paths:
           description: Comma-separated daily forecast variables.
           schema:
             type: string
-            default: temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max
+            default: precipitation_probability_max,wind_speed_10m_max
         - name: forecast_days
           in: query
           required: false
@@ -55,7 +53,7 @@ paths:
             type: integer
             minimum: 1
             maximum: 16
-            default: 3
+            default: 2
         - name: timezone
           in: query
           required: false

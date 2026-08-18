@@ -19,13 +19,11 @@ user-interface type: any application that speaks MCP can connect. It does
 not own or provision the model, the agent, or the upstream identity
 provider; it secures the boundary between them and your internal systems.
 
-> **Status:** Phases 1-7 complete, v1 ready: foundation and safety harness,
-> catalog v2 with the deterministic compiler, the tenant registry,
-> connections, and API-key authentication model, the OpenAPI/Swagger
-> importers, and the fixed MCP toolset with the operation runtime and
-> generic transports, plus the AI backend-analysis skill, the read-only
-> tenant-scoped inspector, examples, migration notes, and release
-> packaging. This repository is a fresh implementation following the
+> **Status:** `0.1.0` early public preview. The core gateway, catalog compiler,
+> tenant registry, MCP runtime, security boundaries, examples, and release
+> packaging are in place. The project is looking for feedback from developers
+> and platform teams evaluating MCP access to internal APIs. This repository is
+> a fresh implementation following the
 > [implementation plan](https://github.com/yashcodelabs/mcp-portico/blob/main/docs/mcp-portico-implementation-plan.md).
 
 **Roadmap:** The [client-neutral MCP roadmap](https://github.com/yashcodelabs/mcp-portico/blob/main/docs/roadmap.md)
@@ -47,6 +45,71 @@ layer for any MCP-compatible AI application.
   instead of arbitrary method/path input.
 - **An operator CLI** - catalog import/validate/diff, registry validation,
   connection testing, and usage analysis.
+
+## CTO view: one governed AI access layer
+
+MCP Portico is useful when a company wants many AI experiences to work with
+internal systems without building a separate security and integration layer
+for every product. Cursor, Claude Code, Codex, support agents, workflow
+copilots, and custom applications can all use the same Portico boundary.
+
+```text
+Many AI hosts
+    │  one MCP contract
+    ▼
+MCP Portico
+    │  identity · tenant policy · catalog gates · approvals · audit
+    ▼
+CRM · ERP · tickets · inventory · finance · observability · internal APIs
+```
+
+| Business scenario   | What an AI host can do                                         | CTO-level control                                           |
+| ------------------- | -------------------------------------------------------------- | ----------------------------------------------------------- |
+| Customer support    | Check orders, refunds, tickets, and delivery status            | Tenant isolation, redaction, approval-gated writes          |
+| Finance operations  | Explain overdue invoices and prepare collection actions        | Backend credentials stay server-side; actions are auditable |
+| Incident response   | Correlate alerts, deployments, logs, and service ownership     | Restricted tools, rate limits, environment boundaries       |
+| Supply chain        | Join weather, inventory, carrier, and order data               | One policy boundary across multiple private systems         |
+| Sales operations    | Summarize account health from CRM, usage, billing, and support | Account-scoped access and reusable integrations             |
+| Security operations | Investigate alerts across IAM, SIEM, tickets, and assets       | Read-only defaults, sensitive-field controls, auditability  |
+| Procurement         | Compare vendors, purchase orders, and contract limits          | Confirmation before creating or changing commitments        |
+
+The weather-aware fulfillment example is deliberately small, but the pattern
+is enterprise-sized: the useful answer requires joining data from multiple
+systems that no single public API can provide.
+
+### What the connected-host experience looks like
+
+```text
+You: Which open orders are at risk from tomorrow's weather?
+
+Host: I found 2 elevated-risk orders:
+      ORD-1001 in New York — 80% rain probability.
+      ORD-1003 in Chicago — 70% rain probability and 48 km/h wind.
+      Both have substitute inventory elsewhere.
+
+You: What is the total order value exposed?
+
+Host: $4,080 across 2 open orders.
+```
+
+The host decides which MCP tools to call. Portico authenticates the host,
+enforces the tenant and catalog policy, and makes the authorized upstream HTTP
+calls. The model never receives backend credentials or unrestricted method/path
+access.
+
+## Who should try it
+
+- **AI and platform engineers** who want one MCP endpoint for several internal
+  APIs without binding their application to a specific model vendor or agent
+  framework.
+- **Security and platform teams** who need tenant isolation, explicit operation
+  policy, separate upstream credentials, SSRF protections, and auditable
+  execution at the MCP boundary.
+- **Developers building MCP clients** who want a deterministic compatibility
+  contract and realistic multi-backend examples to test against.
+
+MCP Portico is self-hosted infrastructure, not a hosted MCP marketplace. It is
+intended to sit inside the security boundary of the team operating it.
 
 ## Architecture
 
@@ -98,17 +161,59 @@ logs, telemetry, or MCP responses.
 ```bash
 # Prerequisites: Node.js >= 22 and pnpm 11
 pnpm install
-pnpm ci:check   # typecheck, format, tests, sweeps, build, smoke
-pnpm serve      # health server on http://127.0.0.1:3000
+pnpm build
+pnpm cli --help
 ```
 
 `mcp-portico --help` and `mcp-portico serve` are available after `pnpm build`.
 
+For an end-to-end walkthrough, see the
+[weather-aware fulfillment risk demo](examples/use-cases/weather-orders-inventory/README.md).
+It joins a public weather API with deterministic private orders and inventory
+backends through the same MCP boundary an enterprise deployment would use.
+
+For a five-minute evaluation with no external services or manual setup, run:
+
+```bash
+pnpm install
+pnpm demo
+```
+
+The command creates temporary credentials and registry state, starts
+deterministic loopback weather, orders, and inventory APIs, runs the joined MCP
+brief, prints a human-readable risk summary, and removes everything before it
+exits.
+
+When run in a terminal, it also offers example questions to choose from. Use
+`mcp-portico demo --non-interactive` for a single pass in scripts or CI.
+
+To use the demo from an existing AI host, keep it running and print a
+ready-to-paste setup for Cursor, Claude Code, or Codex:
+
+```bash
+mcp-portico demo --connect cursor
+mcp-portico demo --connect claude
+mcp-portico demo --connect codex
+```
+
+The server stays alive while the host connects, then removes its temporary
+registry, key, and local APIs when you press Enter to stop it.
+
+Sample questions to ask from any connected host:
+
+- Which open orders are at risk from tomorrow's weather?
+- Which exposed orders have substitute inventory elsewhere?
+- What is the total order value exposed to weather disruption?
+- Compare the weather risk and fulfillment alternatives for New York, Boston,
+  and Chicago.
+
+Maintainers can run `pnpm ci:check` for the complete release gate.
+
 ## Install from npm
 
-The `mcp-portico` npm package ships the CLI, JSON Schemas, public MCP
-compatibility contracts, and runnable examples. The first public release will
-also make the following installation command available:
+The `mcp-portico` package is prepared for a public release and ships the CLI,
+JSON Schemas, public MCP compatibility contracts, and runnable examples. Once
+the first release is published, install it with:
 
 ```bash
 npm install -g mcp-portico
@@ -122,10 +227,15 @@ The supported npm surface is the `mcp-portico` executable, published JSON
 Schemas, and the accompanying documentation. The compiled internal modules are
 not a stable TypeScript library API.
 
+Version tags (`v*`) run the full release gate and publish through the
+repository's npm trusted-publishing workflow.
+
 ## Interface
 
 ```text
 mcp-portico serve --registry <registry-file>      # implemented
+mcp-portico demo                                  # implemented
+mcp-portico demo --connect <cursor|claude|codex>  # implemented
 mcp-portico catalog import <openapi-file> --api-id <id> --output <catalog> --report <report>   # implemented
 mcp-portico catalog import <ai-openapi> --api-id <id> --ai --overlay <overlay> --output <catalog> --report <report>   # implemented (AI-analysis artifacts)
 mcp-portico catalog validate <catalog-file>       # implemented
@@ -213,6 +323,16 @@ are complete. The [roadmap](https://github.com/yashcodelabs/mcp-portico/blob/mai
 now prioritizes operational policy administration, durable observability,
 external secret providers, additional upstream authentication, OAuth, and
 multi-replica administration.
+
+## Feedback and early adoption
+
+If you are evaluating MCP Portico, the most useful feedback includes the MCP
+client, upstream API shape, deployment environment, authentication model, and
+the point where the current design stops fitting your needs. Please
+[share an integration or architecture note](https://github.com/yashcodelabs/mcp-portico/issues/new?template=feedback.yml),
+[report a reproducible bug](https://github.com/yashcodelabs/mcp-portico/issues/new?template=bug_report.yml),
+or propose a concrete improvement through the issue templates. Do not include
+secrets, customer data, or private backend URLs.
 
 ## Contributing
 

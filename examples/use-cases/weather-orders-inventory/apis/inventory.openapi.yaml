@@ -1,0 +1,51 @@
+openapi: 3.0.3
+info:
+  title: Private Inventory API
+  description: >-
+    Internal warehouse inventory used to find substitute fulfillment options.
+    This is private operational data and is not exposed to the public web.
+  version: 1.0.0
+tags:
+  - name: inventory
+    description: Internal inventory operations
+paths:
+  /inventory:
+    get:
+      operationId: inventory.list
+      summary: List available inventory
+      description: Return inventory records visible to the authenticated client.
+      tags: [inventory]
+      parameters:
+        - name: sku
+          in: query
+          required: false
+          description: Optional SKU filter.
+          schema:
+            type: string
+        - name: availableOnly
+          in: query
+          required: false
+          description: Return only records with positive available quantity.
+          schema:
+            type: boolean
+            default: true
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of inventory records to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+      responses:
+        '200':
+          description: Available inventory records.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [sku, warehouseId, warehouseCity, available]
+                  additionalProperties: true

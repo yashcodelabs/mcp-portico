@@ -1,0 +1,92 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "inventory",
+    "title": "Private Inventory API",
+    "version": "1.0.0"
+  },
+  "provenance": {
+    "sourceType": "openapi",
+    "sourceChecksum": "sha256:a4e816c019b48635a001b0a84d1998b1f1b46362aaa60dfa5d2640b55230a5cf",
+    "generatedAt": "2026-08-11T06:41:07.251Z",
+    "compilerVersion": "0.1.0",
+    "confidence": 1,
+    "warnings": [
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation inventory.list risk inferred as \"read\" from method GET"
+      }
+    ]
+  },
+  "checksum": "sha256:052d8fe0f6532a59f1a3d79ba198ece0f5f55ba93df81344ee8fa282cfec0cca",
+  "securitySchemes": {},
+  "operations": {
+    "inventory.list": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/inventory",
+      "summary": "List available inventory",
+      "description": "Return inventory records visible to the authenticated client.",
+      "tags": ["inventory"],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [],
+      "request": {
+        "parameters": {
+          "query": [
+            {
+              "in": "query",
+              "name": "sku",
+              "required": false,
+              "description": "Optional SKU filter.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "in": "query",
+              "name": "availableOnly",
+              "required": false,
+              "description": "Return only records with positive available quantity.",
+              "schema": {
+                "type": "boolean",
+                "default": true
+              }
+            },
+            {
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "description": "Maximum number of inventory records to return.",
+              "schema": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 100
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Available inventory records.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["sku", "warehouseId", "warehouseCity", "available"],
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    }
+  }
+}
