@@ -129,13 +129,13 @@ The strategic value is not only MCP transport. Portico gives an organization a
 repeatable way to make its existing APIs available to AI without creating a
 new integration project for every client or backend.
 
-| Existing estate | Portico outcome | Operating benefit |
-| --- | --- | --- |
-| REST/OpenAPI services | Compiled MCP tools | No per-backend MCP rewrite |
-| Legacy or undocumented internal APIs | Backend-discovered catalog input | Bring more of the estate into the same control plane |
-| Existing MCP servers | Federated behind the same boundary | Preserve existing investments |
-| Claude, Cursor, Codex, and custom agents | One MCP connection | No per-client integration |
-| Sensitive enterprise systems | Tenant-aware, policy-controlled execution | Centralized security and audit |
+| Existing estate                          | Portico outcome                           | Operating benefit                                    |
+| ---------------------------------------- | ----------------------------------------- | ---------------------------------------------------- |
+| REST/OpenAPI services                    | Compiled MCP tools                        | No per-backend MCP rewrite                           |
+| Legacy or undocumented internal APIs     | Backend-discovered catalog input          | Bring more of the estate into the same control plane |
+| Existing MCP servers                     | Federated behind the same boundary        | Preserve existing investments                        |
+| Claude, Cursor, Codex, and custom agents | One MCP connection                        | No per-client integration                            |
+| Sensitive enterprise systems             | Tenant-aware, policy-controlled execution | Centralized security and audit                       |
 
 The weather-aware fulfillment example is deliberately small, but the pattern
 is enterprise-sized: the useful answer requires joining data from multiple
