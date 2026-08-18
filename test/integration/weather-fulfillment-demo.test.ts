@@ -76,4 +76,25 @@ describe('one-command weather fulfillment demo', () => {
     expect(output.join('\n')).toContain('ORD-1001 (New York, NY)');
     expect(output.join('\n')).toContain('Boston, MA: normal risk');
   }, 20_000);
+
+  it('can route a natural-language question through an optional agent', async () => {
+    const output: string[] = [];
+    const choices = ['6', 'q'];
+    const prompts: string[] = [];
+    await runWeatherFulfillmentDemo({
+      interactive: true,
+      ask: async (prompt) => {
+        if (prompt === 'Ask the AI agent: ') return 'Which order is most exposed?';
+        return choices.shift() ?? 'q';
+      },
+      agent: async (prompt) => {
+        prompts.push(prompt);
+        return 'ORD-1003 is most exposed by order value.';
+      },
+      output: (line) => output.push(line),
+    });
+
+    expect(prompts).toEqual(['Which order is most exposed?']);
+    expect(output.join('\n')).toContain('ORD-1003 is most exposed by order value.');
+  }, 20_000);
 });

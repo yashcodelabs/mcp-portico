@@ -47,6 +47,18 @@ In an interactive terminal, choose follow-up questions such as:
 Use `mcp-portico demo --non-interactive` when you want the summary without the
 question menu.
 
+To try the optional AI-agent question, set an OpenAI API key before starting
+the demo:
+
+```powershell
+$env:OPENAI_API_KEY = 'your-api-key'
+pnpm demo
+```
+
+Choose option `6`, enter a natural-language question, and the agent will use
+the live Portico MCP tools before answering. The key is sent only to the model
+provider; backend credentials remain inside the temporary Portico setup.
+
 The remaining sections are an expanded walkthrough for inspecting each piece
 of the example manually.
 
