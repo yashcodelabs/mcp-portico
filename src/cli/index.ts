@@ -26,6 +26,7 @@ import { startServer } from './serve';
 import { formatUsageSummary } from '../telemetry/format';
 import { loadAuditEvents } from '../telemetry/load';
 import { summarizeAudit } from '../telemetry/summary';
+import { runWeatherFulfillmentDemo } from '../demo/weather-fulfillment';
 
 function parsePort(value: string): number {
   const port = Number(value);
@@ -90,6 +91,13 @@ function parsePositiveInt(value: string): number {
   return parsed;
 }
 
+function parseDemoClient(value: string): 'cursor' | 'claude' | 'codex' {
+  if (value !== 'cursor' && value !== 'claude' && value !== 'codex') {
+    throw new InvalidArgumentError('expected "cursor", "claude", or "codex"');
+  }
+  return value;
+}
+
 function collect(value: string, previous: string[]): string[] {
   return [...previous, value];
 }
@@ -152,6 +160,41 @@ program
     }) => {
       try {
         await runServe(options.host, options.port, options.authMode, options.registry);
+      } catch (error) {
+        handleError(error);
+      }
+    },
+  );
+
+program
+  .command('demo')
+  .description(
+    'Run the five-minute weather-aware fulfillment demo with deterministic local backends',
+  )
+  .option(
+    '--max-orders <count>',
+    'maximum number of open orders to evaluate',
+    parsePositiveInt,
+    20,
+  )
+  .option('--non-interactive', 'run once and exit without the question menu')
+  .option(
+    '--connect <client>',
+    'keep the demo running and print setup for Cursor, Claude Code, or Codex',
+    parseDemoClient,
+  )
+  .action(
+    async (options: {
+      maxOrders: number;
+      nonInteractive?: boolean;
+      connect?: 'cursor' | 'claude' | 'codex';
+    }) => {
+      try {
+        await runWeatherFulfillmentDemo({
+          maxOrders: options.maxOrders,
+          interactive: options.nonInteractive !== true && process.stdin.isTTY === true,
+          connect: options.connect,
+        });
       } catch (error) {
         handleError(error);
       }

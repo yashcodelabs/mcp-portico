@@ -46,6 +46,57 @@ layer for any MCP-compatible AI application.
 - **An operator CLI** - catalog import/validate/diff, registry validation,
   connection testing, and usage analysis.
 
+## CTO view: one governed AI access layer
+
+MCP Portico is useful when a company wants many AI experiences to work with
+internal systems without building a separate security and integration layer
+for every product. Cursor, Claude Code, Codex, support agents, workflow
+copilots, and custom applications can all use the same Portico boundary.
+
+```text
+Many AI hosts
+    │  one MCP contract
+    ▼
+MCP Portico
+    │  identity · tenant policy · catalog gates · approvals · audit
+    ▼
+CRM · ERP · tickets · inventory · finance · observability · internal APIs
+```
+
+| Business scenario   | What an AI host can do                                         | CTO-level control                                           |
+| ------------------- | -------------------------------------------------------------- | ----------------------------------------------------------- |
+| Customer support    | Check orders, refunds, tickets, and delivery status            | Tenant isolation, redaction, approval-gated writes          |
+| Finance operations  | Explain overdue invoices and prepare collection actions        | Backend credentials stay server-side; actions are auditable |
+| Incident response   | Correlate alerts, deployments, logs, and service ownership     | Restricted tools, rate limits, environment boundaries       |
+| Supply chain        | Join weather, inventory, carrier, and order data               | One policy boundary across multiple private systems         |
+| Sales operations    | Summarize account health from CRM, usage, billing, and support | Account-scoped access and reusable integrations             |
+| Security operations | Investigate alerts across IAM, SIEM, tickets, and assets       | Read-only defaults, sensitive-field controls, auditability  |
+| Procurement         | Compare vendors, purchase orders, and contract limits          | Confirmation before creating or changing commitments        |
+
+The weather-aware fulfillment example is deliberately small, but the pattern
+is enterprise-sized: the useful answer requires joining data from multiple
+systems that no single public API can provide.
+
+### What the connected-host experience looks like
+
+```text
+You: Which open orders are at risk from tomorrow's weather?
+
+Host: I found 2 elevated-risk orders:
+      ORD-1001 in New York — 80% rain probability.
+      ORD-1003 in Chicago — 70% rain probability and 48 km/h wind.
+      Both have substitute inventory elsewhere.
+
+You: What is the total order value exposed?
+
+Host: $4,080 across 2 open orders.
+```
+
+The host decides which MCP tools to call. Portico authenticates the host,
+enforces the tenant and catalog policy, and makes the authorized upstream HTTP
+calls. The model never receives backend credentials or unrestricted method/path
+access.
+
 ## Who should try it
 
 - **AI and platform engineers** who want one MCP endpoint for several internal
@@ -121,6 +172,41 @@ For an end-to-end walkthrough, see the
 It joins a public weather API with deterministic private orders and inventory
 backends through the same MCP boundary an enterprise deployment would use.
 
+For a five-minute evaluation with no external services or manual setup, run:
+
+```bash
+pnpm install
+pnpm demo
+```
+
+The command creates temporary credentials and registry state, starts
+deterministic loopback weather, orders, and inventory APIs, runs the joined MCP
+brief, prints a human-readable risk summary, and removes everything before it
+exits.
+
+When run in a terminal, it also offers example questions to choose from. Use
+`mcp-portico demo --non-interactive` for a single pass in scripts or CI.
+
+To use the demo from an existing AI host, keep it running and print a
+ready-to-paste setup for Cursor, Claude Code, or Codex:
+
+```bash
+mcp-portico demo --connect cursor
+mcp-portico demo --connect claude
+mcp-portico demo --connect codex
+```
+
+The server stays alive while the host connects, then removes its temporary
+registry, key, and local APIs when you press Enter to stop it.
+
+Sample questions to ask from any connected host:
+
+- Which open orders are at risk from tomorrow's weather?
+- Which exposed orders have substitute inventory elsewhere?
+- What is the total order value exposed to weather disruption?
+- Compare the weather risk and fulfillment alternatives for New York, Boston,
+  and Chicago.
+
 Maintainers can run `pnpm ci:check` for the complete release gate.
 
 ## Install from npm
@@ -148,6 +234,8 @@ repository's npm trusted-publishing workflow.
 
 ```text
 mcp-portico serve --registry <registry-file>      # implemented
+mcp-portico demo                                  # implemented
+mcp-portico demo --connect <cursor|claude|codex>  # implemented
 mcp-portico catalog import <openapi-file> --api-id <id> --output <catalog> --report <report>   # implemented
 mcp-portico catalog import <ai-openapi> --api-id <id> --ai --overlay <overlay> --output <catalog> --report <report>   # implemented (AI-analysis artifacts)
 mcp-portico catalog validate <catalog-file>       # implemented

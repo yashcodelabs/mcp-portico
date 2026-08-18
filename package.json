@@ -70,6 +70,7 @@
     "cli": "tsx src/cli/index.ts",
     "mcp-portico": "tsx src/cli/index.ts",
     "serve": "tsx src/cli/index.ts serve",
+    "demo": "tsx src/cli/index.ts demo",
     "ci:check": "pnpm audit:deps && pnpm typecheck && pnpm format:check && pnpm test && pnpm test:fixtures && pnpm sweep && pnpm build && pnpm smoke && pnpm test:pack"
   },
   "dependencies": {

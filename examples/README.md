@@ -53,7 +53,8 @@ configuration changes per backend.
   workflow agent creates an invoice and confirms the mutation with a token.
 - [Weather-aware fulfillment risk](use-cases/weather-orders-inventory/README.md)
   - an MCP host joins public weather with private orders and inventory to
-    identify fulfillment risk and substitute stock.
+    identify fulfillment risk and substitute stock. Run `pnpm demo` for the
+    five-minute deterministic evaluation path.
 
 See [use-cases/README.md](use-cases/README.md) for the shared principles and
 the split between generic MCP behavior and backend-specific catalog
