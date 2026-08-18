@@ -3,18 +3,18 @@
   "sourceType": "openapi",
   "confidence": 1,
   "source": {
-    "file": "examples/use-cases/weather-market/apis/open-meteo.openapi.yaml",
+    "file": "examples/use-cases/weather-orders-inventory/apis/orders.openapi.yaml",
     "format": "yaml",
     "spec": {
       "kind": "openapi3",
       "version": "3.0.3"
     },
-    "sourceChecksum": "sha256:1e40590f3b43d0f90898994ab8894bc36ec1bb951698c7bf71fe4e3227ddaeb8",
-    "bytes": 2242
+    "sourceChecksum": "sha256:a78d5948e21f77c9068ccc98cdae08fd559b3eb1d3551f37c5209ff8416801cd",
+    "bytes": 1515
   },
   "api": {
-    "id": "weather",
-    "title": "Open-Meteo Forecast API",
+    "id": "orders",
+    "title": "Private Orders API",
     "version": "1.0.0"
   },
   "summary": {
@@ -37,11 +37,11 @@
   "warnings": [
     {
       "code": "INFERRED_RISK",
-      "message": "operation weather.forecast risk inferred as \"read\" from method GET"
+      "message": "operation orders.list risk inferred as \"read\" from method GET"
     }
   ],
   "catalog": {
-    "checksum": "sha256:d7956ea0867e16865d00ee0e666aef39d3623f701ce66321be89c5e323dc0c4d",
+    "checksum": "sha256:3fe3104c7c0baba5a755a396d49a02afdaf42440e0cbe197dcb33f34dfa59bab",
     "operations": 1,
     "available": 1
   }

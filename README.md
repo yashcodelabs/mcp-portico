@@ -19,13 +19,11 @@ user-interface type: any application that speaks MCP can connect. It does
 not own or provision the model, the agent, or the upstream identity
 provider; it secures the boundary between them and your internal systems.
 
-> **Status:** Phases 1-7 complete, v1 ready: foundation and safety harness,
-> catalog v2 with the deterministic compiler, the tenant registry,
-> connections, and API-key authentication model, the OpenAPI/Swagger
-> importers, and the fixed MCP toolset with the operation runtime and
-> generic transports, plus the AI backend-analysis skill, the read-only
-> tenant-scoped inspector, examples, migration notes, and release
-> packaging. This repository is a fresh implementation following the
+> **Status:** `0.1.0` early public preview. The core gateway, catalog compiler,
+> tenant registry, MCP runtime, security boundaries, examples, and release
+> packaging are in place. The project is looking for feedback from developers
+> and platform teams evaluating MCP access to internal APIs. This repository is
+> a fresh implementation following the
 > [implementation plan](https://github.com/yashcodelabs/mcp-portico/blob/main/docs/mcp-portico-implementation-plan.md).
 
 **Roadmap:** The [client-neutral MCP roadmap](https://github.com/yashcodelabs/mcp-portico/blob/main/docs/roadmap.md)
@@ -47,6 +45,20 @@ layer for any MCP-compatible AI application.
   instead of arbitrary method/path input.
 - **An operator CLI** - catalog import/validate/diff, registry validation,
   connection testing, and usage analysis.
+
+## Who should try it
+
+- **AI and platform engineers** who want one MCP endpoint for several internal
+  APIs without binding their application to a specific model vendor or agent
+  framework.
+- **Security and platform teams** who need tenant isolation, explicit operation
+  policy, separate upstream credentials, SSRF protections, and auditable
+  execution at the MCP boundary.
+- **Developers building MCP clients** who want a deterministic compatibility
+  contract and realistic multi-backend examples to test against.
+
+MCP Portico is self-hosted infrastructure, not a hosted MCP marketplace. It is
+intended to sit inside the security boundary of the team operating it.
 
 ## Architecture
 
@@ -98,17 +110,24 @@ logs, telemetry, or MCP responses.
 ```bash
 # Prerequisites: Node.js >= 22 and pnpm 11
 pnpm install
-pnpm ci:check   # typecheck, format, tests, sweeps, build, smoke
-pnpm serve      # health server on http://127.0.0.1:3000
+pnpm build
+pnpm cli --help
 ```
 
 `mcp-portico --help` and `mcp-portico serve` are available after `pnpm build`.
 
+For an end-to-end walkthrough, see the
+[weather-aware fulfillment risk demo](examples/use-cases/weather-orders-inventory/README.md).
+It joins a public weather API with deterministic private orders and inventory
+backends through the same MCP boundary an enterprise deployment would use.
+
+Maintainers can run `pnpm ci:check` for the complete release gate.
+
 ## Install from npm
 
-The `mcp-portico` npm package ships the CLI, JSON Schemas, public MCP
-compatibility contracts, and runnable examples. The first public release will
-also make the following installation command available:
+The `mcp-portico` package is prepared for a public release and ships the CLI,
+JSON Schemas, public MCP compatibility contracts, and runnable examples. Once
+the first release is published, install it with:
 
 ```bash
 npm install -g mcp-portico
@@ -121,6 +140,9 @@ stale build output.
 The supported npm surface is the `mcp-portico` executable, published JSON
 Schemas, and the accompanying documentation. The compiled internal modules are
 not a stable TypeScript library API.
+
+Version tags (`v*`) run the full release gate and publish through the
+repository's npm trusted-publishing workflow.
 
 ## Interface
 
@@ -213,6 +235,16 @@ are complete. The [roadmap](https://github.com/yashcodelabs/mcp-portico/blob/mai
 now prioritizes operational policy administration, durable observability,
 external secret providers, additional upstream authentication, OAuth, and
 multi-replica administration.
+
+## Feedback and early adoption
+
+If you are evaluating MCP Portico, the most useful feedback includes the MCP
+client, upstream API shape, deployment environment, authentication model, and
+the point where the current design stops fitting your needs. Please
+[share an integration or architecture note](https://github.com/yashcodelabs/mcp-portico/issues/new?template=feedback.yml),
+[report a reproducible bug](https://github.com/yashcodelabs/mcp-portico/issues/new?template=bug_report.yml),
+or propose a concrete improvement through the issue templates. Do not include
+secrets, customer data, or private backend URLs.
 
 ## Contributing
 

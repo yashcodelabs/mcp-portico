@@ -51,9 +51,9 @@ configuration changes per backend.
   reads approved internal data without ever seeing a database or service URL.
 - [Workflow with confirmation](use-cases/workflow-confirmation.md) - a
   workflow agent creates an invoice and confirms the mutation with a token.
-- [Weather-aware market brief](use-cases/weather-market/README.md) - an MCP
-  host joins live weather, crypto-market, and FX data into one dated research
-  brief.
+- [Weather-aware fulfillment risk](use-cases/weather-orders-inventory/README.md)
+  - an MCP host joins public weather with private orders and inventory to
+    identify fulfillment risk and substitute stock.
 
 See [use-cases/README.md](use-cases/README.md) for the shared principles and
 the split between generic MCP behavior and backend-specific catalog

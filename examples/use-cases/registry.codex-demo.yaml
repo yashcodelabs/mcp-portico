@@ -1,0 +1,62 @@
+version: 1
+
+tenants:
+  - id: codex-local
+    name: Codex Local Demo
+
+principals:
+  - id: codex-local-agent
+    tenantId: codex-local
+    allowedConnectionIds:
+      - weather
+      - local-support
+      - local-finance
+
+backends:
+  - id: weather
+    title: Open-Meteo Forecast API
+    scope: global
+    catalogRef: ./weather-orders-inventory/apis/open-meteo.catalog.json
+    catalogChecksum: sha256:9b52995ebafb6986f63ea516a036a069ea0c3b35af9bd3dd49f3e6066e775668
+  - id: support
+    title: Local Support Desk API
+    scope: global
+    catalogRef: ./apis/support.catalog.json
+    catalogChecksum: sha256:111804285beb3512700955ed26b1e87c42e8f72cecf778c212be68ada5fc38a7
+  - id: finance
+    title: Local Finance API
+    scope: global
+    catalogRef: ./apis/finance.catalog.json
+    catalogChecksum: sha256:ddce57a6b47d0d5b31572e8d0dafbba1c50f1b51dd23a49c299ea538c033e502
+
+connections:
+  - id: weather
+    tenantId: codex-local
+    backendId: weather
+    baseUrl: https://api.open-meteo.com
+    network:
+      allowedProtocols: [https]
+    auth:
+      type: none
+  - id: local-support
+    tenantId: codex-local
+    backendId: support
+    baseUrl: http://127.0.0.1:4020
+    network:
+      allowedProtocols: [http]
+      allowLoopback: true
+    auth:
+      type: bearer
+      tokenRef: env:SUPPORT_MOCK_TOKEN
+  - id: local-finance
+    tenantId: codex-local
+    backendId: finance
+    baseUrl: http://127.0.0.1:4010
+    network:
+      allowedProtocols: [http]
+      allowLoopback: true
+    auth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      valueRef: env:FINANCE_MOCK_API_KEY

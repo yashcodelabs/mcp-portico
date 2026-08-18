@@ -1,0 +1,62 @@
+version: 1
+
+tenants:
+  - id: fulfillment-research
+    name: Fulfillment Research
+
+principals:
+  - id: fulfillment-agent
+    tenantId: fulfillment-research
+    allowedConnectionIds:
+      - weather
+      - orders
+      - inventory
+
+backends:
+  - id: weather
+    title: Open-Meteo Forecast API
+    scope: global
+    catalogRef: ./apis/open-meteo.catalog.json
+    catalogChecksum: sha256:9b52995ebafb6986f63ea516a036a069ea0c3b35af9bd3dd49f3e6066e775668
+  - id: orders
+    title: Private Orders API
+    scope: global
+    catalogRef: ./apis/orders.catalog.json
+    catalogChecksum: sha256:3fe3104c7c0baba5a755a396d49a02afdaf42440e0cbe197dcb33f34dfa59bab
+  - id: inventory
+    title: Private Inventory API
+    scope: global
+    catalogRef: ./apis/inventory.catalog.json
+    catalogChecksum: sha256:052d8fe0f6532a59f1a3d79ba198ece0f5f55ba93df81344ee8fa282cfec0cca
+
+connections:
+  - id: weather
+    tenantId: fulfillment-research
+    backendId: weather
+    baseUrl: https://api.open-meteo.com
+    network:
+      allowedProtocols: [https]
+    auth:
+      type: none
+  - id: orders
+    tenantId: fulfillment-research
+    backendId: orders
+    baseUrl: http://127.0.0.1:4030
+    network:
+      allowedProtocols: [http]
+      allowLoopback: true
+    auth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      valueRef: env:ORDERS_MOCK_API_KEY
+  - id: inventory
+    tenantId: fulfillment-research
+    backendId: inventory
+    baseUrl: http://127.0.0.1:4040
+    network:
+      allowedProtocols: [http]
+      allowLoopback: true
+    auth:
+      type: bearer
+      tokenRef: env:INVENTORY_MOCK_TOKEN

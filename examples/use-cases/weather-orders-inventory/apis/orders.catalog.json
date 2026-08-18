@@ -1,0 +1,92 @@
+{
+  "catalogVersion": "2.0",
+  "api": {
+    "id": "orders",
+    "title": "Private Orders API",
+    "version": "1.0.0"
+  },
+  "provenance": {
+    "sourceType": "openapi",
+    "sourceChecksum": "sha256:a78d5948e21f77c9068ccc98cdae08fd559b3eb1d3551f37c5209ff8416801cd",
+    "generatedAt": "2026-08-11T06:41:06.881Z",
+    "compilerVersion": "0.1.0",
+    "confidence": 1,
+    "warnings": [
+      {
+        "code": "INFERRED_RISK",
+        "message": "operation orders.list risk inferred as \"read\" from method GET"
+      }
+    ]
+  },
+  "checksum": "sha256:3fe3104c7c0baba5a755a396d49a02afdaf42440e0cbe197dcb33f34dfa59bab",
+  "securitySchemes": {},
+  "operations": {
+    "orders.list": {
+      "enabled": true,
+      "available": true,
+      "method": "GET",
+      "path": "/orders",
+      "summary": "List fulfillment orders",
+      "description": "Return orders visible to the authenticated internal client.",
+      "tags": ["orders"],
+      "risk": "read",
+      "confirmation": "never",
+      "timeoutMs": 30000,
+      "maxRequestBytes": 10485760,
+      "maxResponseBytes": 10485760,
+      "maxConcurrency": 4,
+      "security": [],
+      "request": {
+        "parameters": {
+          "query": [
+            {
+              "in": "query",
+              "name": "status",
+              "required": false,
+              "description": "Optional order status filter.",
+              "schema": {
+                "type": "string",
+                "default": "open"
+              }
+            },
+            {
+              "in": "query",
+              "name": "limit",
+              "required": false,
+              "description": "Maximum number of orders to return.",
+              "schema": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 20
+              }
+            }
+          ]
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Orders visible to this client.",
+          "contentTypes": ["application/json"],
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "sku",
+                "quantity",
+                "latitude",
+                "longitude",
+                "destination",
+                "promisedDate",
+                "orderValueUsd"
+              ],
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

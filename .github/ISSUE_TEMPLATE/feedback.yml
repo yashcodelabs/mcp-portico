@@ -1,0 +1,39 @@
+name: Adoption or architecture feedback
+description: Share what you are trying to build and where MCP Portico fits or falls short.
+title: '[Feedback]: '
+labels:
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for evaluating MCP Portico. Do not include secrets, customer data, tokens, or private backend URLs.
+  - type: textarea
+    id: context
+    attributes:
+      label: What are you trying to build?
+      description: Describe the MCP client or agent, upstream APIs, and the workflow you want to enable.
+    validations:
+      required: true
+  - type: textarea
+    id: fit
+    attributes:
+      label: Where does Portico fit or fall short?
+      description: Tell us what worked, what was unclear, and what blocked adoption.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Deployment environment
+      placeholder: Kubernetes, VM, local development, cloud platform, etc.
+  - type: input
+    id: version
+    attributes:
+      label: MCP Portico version or commit
+      placeholder: 0.1.0 or commit SHA
+  - type: textarea
+    id: next
+    attributes:
+      label: Most valuable next improvement
+      description: What would make you more likely to deploy or recommend it?

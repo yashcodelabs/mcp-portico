@@ -3,18 +3,18 @@
   "sourceType": "openapi",
   "confidence": 1,
   "source": {
-    "file": "examples/use-cases/weather-market/apis/coingecko.openapi.yaml",
+    "file": "examples/use-cases/weather-orders-inventory/apis/inventory.openapi.yaml",
     "format": "yaml",
     "spec": {
       "kind": "openapi3",
       "version": "3.0.3"
     },
-    "sourceChecksum": "sha256:38853e021e7d30aeae743e161e8dd4d4d653543ce82fde6760796eca4f97b5ce",
-    "bytes": 1690
+    "sourceChecksum": "sha256:a4e816c019b48635a001b0a84d1998b1f1b46362aaa60dfa5d2640b55230a5cf",
+    "bytes": 1526
   },
   "api": {
-    "id": "crypto-market",
-    "title": "CoinGecko Simple Price API",
+    "id": "inventory",
+    "title": "Private Inventory API",
     "version": "1.0.0"
   },
   "summary": {
@@ -37,11 +37,11 @@
   "warnings": [
     {
       "code": "INFERRED_RISK",
-      "message": "operation market.simple_price risk inferred as \"read\" from method GET"
+      "message": "operation inventory.list risk inferred as \"read\" from method GET"
     }
   ],
   "catalog": {
-    "checksum": "sha256:086765d0821344ceb936e1ca92966b999d97f272258cce738dc59e82e5366bd8",
+    "checksum": "sha256:052d8fe0f6532a59f1a3d79ba198ece0f5f55ba93df81344ee8fa282cfec0cca",
     "operations": 1,
     "available": 1
   }

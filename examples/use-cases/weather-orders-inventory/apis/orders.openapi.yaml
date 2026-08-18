@@ -1,0 +1,53 @@
+openapi: 3.0.3
+info:
+  title: Private Orders API
+  description: >-
+    Internal order data used to identify fulfillment risk. This is a local
+    demo contract and represents information that public AI agents cannot see.
+  version: 1.0.0
+tags:
+  - name: orders
+    description: Internal order operations
+paths:
+  /orders:
+    get:
+      operationId: orders.list
+      summary: List fulfillment orders
+      description: Return orders visible to the authenticated internal client.
+      tags: [orders]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Optional order status filter.
+          schema:
+            type: string
+            default: open
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of orders to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Orders visible to this client.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - sku
+                    - quantity
+                    - latitude
+                    - longitude
+                    - destination
+                    - promisedDate
+                    - orderValueUsd
+                  additionalProperties: true
